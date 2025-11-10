@@ -1,0 +1,33 @@
+{
+  "version": "v1",
+  "packages": {
+    "@jbcbdse/charlie": {
+      "signature": "aeb13f5aa6728e8be5b0b4ce55ca8610",
+      "file": true
+    },
+    "@jbcbdse/charlie-openai": {
+      "version": "0.1.1",
+      "signature": "b74d57b129a923c52d5bdd5c83dbbe98",
+      "file": true,
+      "replaced": "^0.1.0"
+    },
+    "@jbcbdse/charlie-core": {
+      "version": "0.1.1",
+      "signature": "85ed1c8458cb20d4bc7efa808c065a62",
+      "file": true,
+      "replaced": "^0.1.0"
+    },
+    "@jbcbdse/charlie-google": {
+      "version": "0.1.1",
+      "signature": "0de6ef6d30416d0ce47300cbbc590ba5",
+      "file": true,
+      "replaced": "^0.1.0"
+    },
+    "@jbcbdse/charlie-bedrock": {
+      "version": "0.1.1",
+      "signature": "3520cfaf158beeeb6d214eb92fcf766e",
+      "file": true,
+      "replaced": "^0.1.0"
+    }
+  }
+}
