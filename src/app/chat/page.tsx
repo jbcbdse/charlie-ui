@@ -23,25 +23,41 @@ export default function ChatPage() {
   }, []);
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMessages = async () => {
-      const response = await getMessages(uniqueId);
-      console.log(response);
-      setMessages(response);
-    }
+      try {
+        const response = await getMessages(uniqueId);
+        setMessages(response);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load messages");
+      }
+    };
     if (uniqueId) {
       fetchMessages();
     }
   }, [uniqueId]);
-  
-  const handleClear = async () => {
-    await clearMessages(uniqueId);
-    setMessages([]);
-  }
 
-  const handleSendMessage = async ({ text, agentId }: { text: string, agentId: string }) => {
-    if(text === '/clear') {
+  const handleClear = async () => {
+    try {
+      await clearMessages(uniqueId);
+      setMessages([]);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear messages");
+    }
+  };
+
+  const handleSendMessage = async ({
+    text,
+    agentId,
+  }: {
+    text: string;
+    agentId: string;
+  }) => {
+    if (text === "/clear") {
       return handleClear();
     }
     const newMessage: MessageUser = {
@@ -50,19 +66,27 @@ export default function ChatPage() {
       content: text,
     };
     setMessages((prevMessages) => [...prevMessages, newMessage]);
-    const response = await sendMessage({ 
-      user: { id: uniqueId },
-      agent: agentId,
-      message: newMessage,
-    });
-    setMessages((prevMessages) => [...prevMessages, ...response]);
+    setError(null);
+    try {
+      const response = await sendMessage({
+        user: { id: uniqueId },
+        agent: agentId,
+        message: newMessage,
+      });
+      setMessages((prevMessages) => [...prevMessages, ...response]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send message");
+    }
   };
 
   return (
     <PageCard>
       <div className="chat-box flex flex-col space-y-4">
         <MessageList messages={messages} />
-        <ChatInput onSubmit={handleSendMessage}/>
+        {error ? (
+          <div className="text-red-600 text-center text-sm px-4">{error}</div>
+        ) : null}
+        <ChatInput onSubmit={handleSendMessage} />
       </div>
       <div className="mt-4 text-gray-600 text-center">
         Your unique ID: {uniqueId}

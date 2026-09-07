@@ -24,13 +24,13 @@ describe("tools", () => {
     expect(getTools()).toHaveLength(3);
   });
 
-  it("produces JSON schema via zod 4", () => {
+  it("validates calculator input via BaseTool.handle", async () => {
     const tool = new CalculatorTool();
-    expect(tool.jsonSchema).toMatchObject({
-      type: "object",
-      properties: {
-        expr: expect.objectContaining({ type: "string" }),
-      },
-    });
+    await expect(
+      tool.handle({ expr: "3 * 3" }, {} as never),
+    ).resolves.toContain("9");
+    await expect(tool.handle({ expr: 1 }, {} as never)).rejects.toThrow(
+      /Invalid parameters/,
+    );
   });
 });

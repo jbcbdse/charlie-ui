@@ -52,3 +52,30 @@ test("sending a message renders the assistant reply", async ({ page }) => {
   await expect(page.getByText("hello there")).toBeVisible();
   await expect(page.getByText("Mocked assistant reply")).toBeVisible();
 });
+
+test("unknown agent shows an error instead of crashing", async ({ page }) => {
+  await page.route("**/api/message/**", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "[]",
+      });
+      return;
+    }
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Unknown agent: nope" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/chat");
+  await page.locator("textarea").fill("hello");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Unknown agent: nope")).toBeVisible();
+});

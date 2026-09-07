@@ -5,7 +5,6 @@ import {
 } from "@jbcbdse/charlie-core";
 import {
   BedrockChatExecutor,
-  InlineToolCallParser,
 } from "@jbcbdse/charlie-bedrock";
 import {
   GrokExecutor,
@@ -25,10 +24,6 @@ const promptTemplate = [
 ].join("\n");
 
 const toolAssistantFilter = new ToolAssistantFilter();
-const bedrockPreToolCallTransformers = [
-  new InlineToolCallParser(),
-  toolAssistantFilter,
-];
 
 export const agents: Record<AvailableAgent, ChatAgent> = {
   [AvailableAgent.claude]: new AiChatAgent({
@@ -62,10 +57,9 @@ export const agents: Record<AvailableAgent, ChatAgent> = {
   [AvailableAgent.titan]: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "us.amazon.nova-micro-v1:0",
-      toolsSupported: false,
     }),
     systemPromptTemplate: promptTemplate,
-    preToolCallTransformers: bedrockPreToolCallTransformers,
+    preToolCallTransformers: [toolAssistantFilter],
   }),
   [AvailableAgent.gpt4o]: new AiChatAgent({
     chatExecutor: new OpenAiChatExecutor({
