@@ -1,61 +1,74 @@
-export const MODEL_GROUPS = [
-  {
-    provider: "Amazon Bedrock",
-    models: [
-      { id: "claude", label: "Claude Sonnet 4.6" },
-      { id: "mistral", label: "Mistral Large 3" },
-      { id: "llama3", label: "Llama 3.3 70B" },
-      { id: "nova", label: "Nova 2 Lite" },
-      { id: "titan", label: "Nova Micro" },
-    ],
+export const PROVIDERS = {
+  bedrock: {
+    label: "Amazon Bedrock",
+    models: {
+      claude: { label: "Claude Sonnet 4.6" },
+      mistral: { label: "Mistral Large 3" },
+      llama3: { label: "Llama 3.3 70B" },
+      nova: { label: "Nova 2 Lite" },
+      titan: { label: "Nova Micro" },
+    },
   },
-  {
-    provider: "OpenAI",
-    models: [
-      { id: "gpt4o", label: "GPT-4o" },
-      { id: "o4mini", label: "o4-mini" },
-    ],
+  openai: {
+    label: "OpenAI",
+    models: {
+      gpt4o: { label: "GPT-4o" },
+      o4mini: { label: "o4-mini" },
+    },
   },
-  {
-    provider: "xAI",
-    models: [{ id: "grok", label: "Grok 4.3" }],
+  xai: {
+    label: "xAI",
+    models: {
+      grok: { label: "Grok 4.3" },
+    },
   },
-  {
-    provider: "Google",
-    models: [
-      { id: "geminiFlash", label: "Gemini 2.5 Flash" },
-      { id: "geminiPro", label: "Gemini 2.5 Pro" },
-    ],
+  google: {
+    label: "Google",
+    models: {
+      geminiFlash: { label: "Gemini 2.5 Flash" },
+      geminiPro: { label: "Gemini 2.5 Pro" },
+    },
   },
-  {
-    provider: "Ollama",
-    models: [
-      { id: "ollama", label: "Qwen 3.5 9B" },
-      { id: "ollama35b", label: "Qwen 3.6 35B" },
-    ],
+  ollama: {
+    label: "Ollama",
+    models: {
+      ollama: { label: "Qwen 3.5 9B" },
+      ollama35b: { label: "Qwen 3.6 35B" },
+    },
   },
-] as const;
+} as const;
 
-export type AvailableAgent =
-  (typeof MODEL_GROUPS)[number]["models"][number]["id"];
+export type ProviderId = keyof typeof PROVIDERS;
 
-export const AvailableAgent = {
-  claude: "claude",
-  mistral: "mistral",
-  llama3: "llama3",
-  nova: "nova",
-  titan: "titan",
-  gpt4o: "gpt4o",
-  o4mini: "o4mini",
-  grok: "grok",
-  geminiFlash: "geminiFlash",
-  geminiPro: "geminiPro",
-  ollama: "ollama",
-  ollama35b: "ollama35b",
-} as const satisfies Record<AvailableAgent, AvailableAgent>;
+export type AvailableAgent = {
+  [P in ProviderId]: keyof (typeof PROVIDERS)[P]["models"];
+}[ProviderId];
 
-export const DEFAULT_AGENT: AvailableAgent = AvailableAgent.gpt4o;
+export const DEFAULT_AGENT: AvailableAgent = "gpt4o";
 
 export function allAgentIds(): AvailableAgent[] {
-  return MODEL_GROUPS.flatMap((group) => group.models.map((m) => m.id));
+  return (Object.keys(PROVIDERS) as ProviderId[]).flatMap(
+    (provider) =>
+      Object.keys(PROVIDERS[provider].models) as AvailableAgent[],
+  );
+}
+
+export function isAvailableAgent(value: string): value is AvailableAgent {
+  return (allAgentIds() as string[]).includes(value);
+}
+
+/** Flat optgroup list for the model `<select>`. */
+export function modelGroups(): {
+  provider: string;
+  models: { id: AvailableAgent; label: string }[];
+}[] {
+  return (Object.keys(PROVIDERS) as ProviderId[]).map((providerId) => {
+    const group = PROVIDERS[providerId];
+    return {
+      provider: group.label,
+      models: (
+        Object.entries(group.models) as [AvailableAgent, { label: string }][]
+      ).map(([id, model]) => ({ id, label: model.label })),
+    };
+  });
 }

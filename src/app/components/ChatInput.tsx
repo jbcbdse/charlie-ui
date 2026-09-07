@@ -1,8 +1,8 @@
 "use client";
 import {
-  AvailableAgent,
   DEFAULT_AGENT,
-  MODEL_GROUPS,
+  isAvailableAgent,
+  modelGroups,
 } from "@/lib/available-agents";
 import React, { useState, useRef, useEffect } from "react";
 
@@ -14,13 +14,11 @@ export default function ChatInput({ onSubmit }: Props) {
   const [inputValue, setInputValue] = useState("");
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const groups = modelGroups();
 
   useEffect(() => {
     const storedValue = localStorage.getItem("agentId");
-    if (
-      storedValue &&
-      Object.values(AvailableAgent).includes(storedValue as AvailableAgent)
-    ) {
+    if (storedValue && isAvailableAgent(storedValue)) {
       setAgentId(storedValue);
     } else {
       setAgentId(DEFAULT_AGENT);
@@ -77,7 +75,7 @@ export default function ChatInput({ onSubmit }: Props) {
             onChange={handleAgentChange}
             className="border border-gray-300 rounded p-2 text-black"
           >
-            {MODEL_GROUPS.map((group) => (
+            {groups.map((group) => (
               <optgroup key={group.provider} label={group.provider}>
                 {group.models.map((model) => (
                   <option key={model.id} value={model.id}>

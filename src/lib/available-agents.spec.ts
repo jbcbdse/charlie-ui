@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
-  AvailableAgent,
-  MODEL_GROUPS,
+  PROVIDERS,
   allAgentIds,
   DEFAULT_AGENT,
+  modelGroups,
 } from "@/lib/available-agents";
 import { agents } from "@/lib/agents";
 
 describe("model catalog", () => {
   it("groups models by provider", () => {
-    expect(MODEL_GROUPS.map((g) => g.provider)).toEqual([
+    expect(Object.values(PROVIDERS).map((g) => g.label)).toEqual([
+      "Amazon Bedrock",
+      "OpenAI",
+      "xAI",
+      "Google",
+      "Ollama",
+    ]);
+    expect(modelGroups().map((g) => g.provider)).toEqual([
       "Amazon Bedrock",
       "OpenAI",
       "xAI",
@@ -30,6 +37,7 @@ describe("model catalog", () => {
   });
 
   it("defaults to gpt4o", () => {
-    expect(DEFAULT_AGENT).toBe(AvailableAgent.gpt4o);
+    expect(DEFAULT_AGENT).toBe("gpt4o");
+    expect(PROVIDERS.openai.models.gpt4o).toBeDefined();
   });
 });

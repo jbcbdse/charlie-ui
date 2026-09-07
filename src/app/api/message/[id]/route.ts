@@ -7,11 +7,7 @@ import {
   getMessages,
   saveMesssages,
 } from "@/lib/file-memory";
-import { AvailableAgent, allAgentIds } from "@/lib/available-agents";
-
-function isAvailableAgent(value: string): value is AvailableAgent {
-  return (allAgentIds() as string[]).includes(value);
-}
+import { isAvailableAgent } from "@/lib/available-agents";
 
 export async function POST(
   req: NextRequest,
