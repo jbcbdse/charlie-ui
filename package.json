@@ -6,30 +6,37 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test --project=e2e",
+    "test:smoke": "playwright test --project=smoke"
   },
   "dependencies": {
-    "@jbcbdse/charlie-bedrock": "file:.yalc/@jbcbdse/charlie-bedrock",
-    "@jbcbdse/charlie-core": "file:.yalc/@jbcbdse/charlie-core",
-    "@jbcbdse/charlie-google": "file:.yalc/@jbcbdse/charlie-google",
-    "@jbcbdse/charlie-openai": "file:.yalc/@jbcbdse/charlie-openai",
-    "@ricky0123/vad-react": "^0.0.28",
+    "@jbcbdse/charlie-bedrock": "^1.0.0",
+    "@jbcbdse/charlie-core": "^1.0.0",
+    "@jbcbdse/charlie-google": "^1.0.0",
+    "@jbcbdse/charlie-ollama": "^1.0.0",
+    "@jbcbdse/charlie-openai": "^1.0.0",
+    "@ricky0123/vad-react": "^0.0.36",
     "expr-eval": "^2.0.2",
-    "next": "14.2.7",
-    "openai": "^4.96.2",
-    "react": "^18",
-    "react-dom": "^18",
+    "next": "^15.5.25",
+    "openai": "^6.39.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-markdown": "^9.0.1",
-    "zod": "^3.23.8"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "eslint": "^8",
-    "eslint-config-next": "14.2.7",
+    "eslint-config-next": "^15.5.25",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

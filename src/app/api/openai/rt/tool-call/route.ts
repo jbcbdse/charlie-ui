@@ -3,6 +3,7 @@ import { CurrentTimeTool } from '@/lib/tools/current-time.tool';
 import { CountLettersTool } from '@/lib/tools/letter-count.tool';
 import { ToolCallApiRequest, ToolCallApiResponse } from '@/types/api';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeToolResult } from '@jbcbdse/charlie-core';
 
 export async function POST(request: NextRequest): Promise<NextResponse<ToolCallApiResponse>> {
   const allTools = [
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ToolCallA
       return NextResponse.json({
         name: body.name,
         callId: body.callId,
-        result: result,
+        result: normalizeToolResult(result).content,
       });
     } catch(err) {
       return NextResponse.json({
@@ -48,4 +49,4 @@ export async function POST(request: NextRequest): Promise<NextResponse<ToolCallA
       result: 'Error calling tool',
     }, { status: 500 });
   }
-} 
+}
