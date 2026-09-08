@@ -1,11 +1,16 @@
 import React from "react"
 import Markdown from "react-markdown"
 import { ChatMessage } from "@jbcbdse/charlie-core";
+import Thoughts from "./Thoughts";
 
 type Props = {
   message: ChatMessage;
+  streaming?: boolean;
 }
-export default function Message({message}: Props) {
+export default function Message({message, streaming}: Props) {
+  if (message.role === "reasoning") {
+    return <Thoughts content={message.content ?? ""} />;
+  }
   const direction = message.role === "user" ? "outgoing" : "incoming";
   const speaker = message.role === "user" ? message.name || "User" :
     message.role === "assistant" ? message.name || "Assistant" :
@@ -37,6 +42,9 @@ export default function Message({message}: Props) {
       >
         <div className="text-xs font-semibold mb-1">{speaker}</div>
         <Markdown className="message-content">{content}</Markdown>
+        {streaming ? (
+          <span className="inline-block w-2 h-4 ml-0.5 align-middle bg-gray-700 animate-pulse" />
+        ) : null}
       </div>
     </div>
   )

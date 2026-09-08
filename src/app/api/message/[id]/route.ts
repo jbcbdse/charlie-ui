@@ -8,6 +8,16 @@ import {
   saveMesssages,
 } from "@/lib/file-memory";
 import { isAvailableAgent } from "@/lib/available-agents";
+import {
+  STREAM_CONTENT_TYPE,
+  consumeChatRun,
+  encodeStreamEvent,
+  MessageStreamEvent,
+} from "@/lib/message-stream";
+import { ChatMessage } from "@jbcbdse/charlie-core";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(
   req: NextRequest,
@@ -30,21 +40,45 @@ export async function POST(
     }
 
     const agent = agents[agentId];
-    const response = await agent.getResponse({
+    const run = agent.getResponse({
       tools: getTools(),
       meta: {
         user: { id: userId, ...(body.user ?? {}) },
       },
       messages: [...(await getMessages(userId)), message],
     });
-    const responseMessages = response.responseMessages;
-    responseMessages
-      .filter((m) => m.role === "assistant")
-      .forEach((m) => {
-        m.name ??= agentId;
-      });
-    await saveMesssages(userId, [message, ...responseMessages]);
-    return NextResponse.json(responseMessages);
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const write = (event: MessageStreamEvent) => {
+          controller.enqueue(encoder.encode(encodeStreamEvent(event)));
+        };
+        try {
+          const responseMessages = await consumeChatRun(run, (chunk) => {
+            write({ type: "chunk", chunk });
+          });
+          tagAssistant(responseMessages, agentId);
+          await saveMesssages(userId, [message, ...responseMessages]);
+          write({ type: "done", messages: responseMessages });
+          controller.close();
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Request failed";
+          write({ type: "error", error: errorMessage });
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": STREAM_CONTENT_TYPE,
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed";
     const status = message === "Invalid user id" ? 400 : 500;
@@ -80,4 +114,12 @@ export async function DELETE(
     const status = message === "Invalid user id" ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
+}
+
+function tagAssistant(messages: ChatMessage[], agentId: string): void {
+  messages
+    .filter((m) => m.role === "assistant")
+    .forEach((m) => {
+      m.name ??= agentId;
+    });
 }

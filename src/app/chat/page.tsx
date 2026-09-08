@@ -6,6 +6,12 @@ import { useState, useEffect } from 'react';
 import { ChatMessage, MessageUser } from '@jbcbdse/charlie-core';
 import { generateUniqueString } from '@/lib/generate-unique-string';
 import { clearMessages, getMessages, sendMessage } from '@/lib/send-message';
+import {
+  applyStreamChunk,
+  emptyStreamPreview,
+  mergeStreamedThoughts,
+  StreamPreview,
+} from '@/lib/message-stream';
 
 export default function ChatPage() {
   
@@ -23,6 +29,7 @@ export default function ChatPage() {
   }, []);
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [stream, setStream] = useState<StreamPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +51,7 @@ export default function ChatPage() {
     try {
       await clearMessages(uniqueId);
       setMessages([]);
+      setStream(null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to clear messages");
@@ -66,15 +74,30 @@ export default function ChatPage() {
       content: text,
     };
     setMessages((prevMessages) => [...prevMessages, newMessage]);
+    setStream(emptyStreamPreview());
     setError(null);
+    let preview = emptyStreamPreview();
     try {
-      const response = await sendMessage({
-        user: { id: uniqueId },
-        agent: agentId,
-        message: newMessage,
-      });
-      setMessages((prevMessages) => [...prevMessages, ...response]);
+      const response = await sendMessage(
+        {
+          user: { id: uniqueId },
+          agent: agentId,
+          message: newMessage,
+        },
+        {
+          onChunk: (chunk) => {
+            preview = applyStreamChunk(preview, chunk);
+            setStream({ ...preview });
+          },
+        },
+      );
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        ...mergeStreamedThoughts(response, preview.thinking),
+      ]);
+      setStream(null);
     } catch (err) {
+      setStream(null);
       setError(err instanceof Error ? err.message : "Failed to send message");
     }
   };
@@ -82,15 +105,15 @@ export default function ChatPage() {
   return (
     <PageCard>
       <div className="chat-box flex flex-col space-y-4">
-        <MessageList messages={messages} />
+        <MessageList messages={messages} stream={stream} />
         {error ? (
           <div className="text-red-600 text-center text-sm px-4">{error}</div>
         ) : null}
-        <ChatInput onSubmit={handleSendMessage} />
+        <ChatInput onSubmit={handleSendMessage} disabled={!!stream} />
       </div>
       <div className="mt-4 text-gray-600 text-center">
         Your unique ID: {uniqueId}
       </div>
     </PageCard>
   );
-} 
+}

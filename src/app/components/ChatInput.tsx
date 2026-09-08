@@ -8,9 +8,10 @@ import React, { useState, useRef, useEffect } from "react";
 
 interface Props {
   onSubmit(event: { text: string; agentId: string }): void;
+  disabled?: boolean;
 }
 
-export default function ChatInput({ onSubmit }: Props) {
+export default function ChatInput({ onSubmit, disabled }: Props) {
   const [inputValue, setInputValue] = useState("");
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,6 +56,9 @@ export default function ChatInput({ onSubmit }: Props) {
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (disabled) {
+      return;
+    }
     if (inputValue.trim()) {
       onSubmit({ text: inputValue, agentId });
       setInputValue("");
@@ -73,6 +77,7 @@ export default function ChatInput({ onSubmit }: Props) {
             name="agentId"
             value={agentId}
             onChange={handleAgentChange}
+            disabled={disabled}
             className="border border-gray-300 rounded p-2 text-black"
           >
             {groups.map((group) => (
@@ -93,10 +98,15 @@ export default function ChatInput({ onSubmit }: Props) {
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          disabled={disabled}
           rows={1}
           style={{ maxHeight: "7rem" }}
         />
-        <button type="submit" className="bg-blue-500 text-white rounded p-2">
+        <button
+          type="submit"
+          disabled={disabled}
+          className="bg-blue-500 text-white rounded p-2 disabled:opacity-50"
+        >
           Send message
         </button>
       </form>

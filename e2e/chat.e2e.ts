@@ -18,7 +18,9 @@ test("chat page shows provider-grouped model select", async ({ page }) => {
   await expect(select.locator('option[value="ollama"]')).toHaveCount(1);
 });
 
-test("sending a message renders the assistant reply", async ({ page }) => {
+test("sending a message streams tokens then replaces with the complete reply", async ({
+  page,
+}) => {
   await page.route("**/api/message/**", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
@@ -31,14 +33,28 @@ test("sending a message renders the assistant reply", async ({ page }) => {
     if (route.request().method() === "POST") {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([
-          {
-            role: "assistant",
-            name: "gpt4o",
-            content: "Mocked assistant reply 😼",
-          },
-        ]),
+        contentType: "application/x-ndjson",
+        body: [
+          JSON.stringify({
+            type: "chunk",
+            chunk: { type: "thinking", text: "ponder this" },
+          }),
+          JSON.stringify({
+            type: "chunk",
+            chunk: { type: "text", text: "partial-STREAM-ONLY" },
+          }),
+          JSON.stringify({
+            type: "done",
+            messages: [
+              {
+                role: "assistant",
+                name: "gpt4o",
+                content: "Mocked assistant reply 😼",
+              },
+            ],
+          }),
+          "",
+        ].join("\n"),
       });
       return;
     }
@@ -51,6 +67,9 @@ test("sending a message renders the assistant reply", async ({ page }) => {
 
   await expect(page.getByText("hello there")).toBeVisible();
   await expect(page.getByText("Mocked assistant reply")).toBeVisible();
+  await expect(page.getByText("partial-STREAM-ONLY")).toHaveCount(0);
+  await page.getByText("Thoughts").click();
+  await expect(page.getByText("ponder this")).toBeVisible();
 });
 
 test("unknown agent shows an error instead of crashing", async ({ page }) => {
