@@ -10,9 +10,8 @@ import {
 import { isAvailableAgent } from "@/lib/available-agents";
 import {
   STREAM_CONTENT_TYPE,
-  consumeChatRun,
-  encodeStreamEvent,
-  MessageStreamEvent,
+  createNdjsonStream,
+  listenChatRun,
 } from "@/lib/message-stream";
 import { ChatMessage } from "@jbcbdse/charlie-core";
 
@@ -40,45 +39,34 @@ export async function POST(
     }
 
     const agent = agents[agentId];
+    const history = await getMessages(userId);
     const run = agent.getResponse({
       tools: getTools(),
       meta: {
-        user: { id: userId, ...(body.user ?? {}) },
+        user: { ...(body.user ?? {}), id: userId },
       },
-      messages: [...(await getMessages(userId)), message],
+      messages: [...history, message],
     });
+    const listening = listenChatRun(run);
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const write = (event: MessageStreamEvent) => {
-          controller.enqueue(encoder.encode(encodeStreamEvent(event)));
-        };
-        try {
-          const responseMessages = await consumeChatRun(run, (chunk) => {
-            write({ type: "chunk", chunk });
-          });
+    return new Response(
+      createNdjsonStream({
+        listening,
+        complete: async () => {
+          const responseMessages = await listening.messages();
           tagAssistant(responseMessages, agentId);
           await saveMesssages(userId, [message, ...responseMessages]);
-          write({ type: "done", messages: responseMessages });
-          controller.close();
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Request failed";
-          write({ type: "error", error: errorMessage });
-          controller.close();
-        }
+          return responseMessages;
+        },
+      }),
+      {
+        headers: {
+          "Content-Type": STREAM_CONTENT_TYPE,
+          "Cache-Control": "no-cache, no-transform",
+          "X-Accel-Buffering": "no",
+        },
       },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": STREAM_CONTENT_TYPE,
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
-    });
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed";
     const status = message === "Invalid user id" ? 400 : 500;

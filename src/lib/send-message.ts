@@ -22,7 +22,10 @@ export async function sendMessage(
     agent: string;
     message: { content: string };
   },
-  options?: { onChunk?: (chunk: StreamChunk) => void },
+  options?: {
+    onChunk?: (chunk: StreamChunk) => void;
+    signal?: AbortSignal;
+  },
 ): Promise<ChatMessage[]> {
   const response = await fetch(`/api/message/${body.user.id}`, {
     method: "POST",
@@ -30,6 +33,7 @@ export async function sendMessage(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
   if (!response.ok) {
     await parseJson(response);

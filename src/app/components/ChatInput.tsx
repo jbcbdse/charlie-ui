@@ -8,10 +8,11 @@ import React, { useState, useRef, useEffect } from "react";
 
 interface Props {
   onSubmit(event: { text: string; agentId: string }): void;
-  disabled?: boolean;
+  onStop?(): void;
+  streaming?: boolean;
 }
 
-export default function ChatInput({ onSubmit, disabled }: Props) {
+export default function ChatInput({ onSubmit, onStop, streaming }: Props) {
   const [inputValue, setInputValue] = useState("");
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -56,7 +57,7 @@ export default function ChatInput({ onSubmit, disabled }: Props) {
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (disabled) {
+    if (streaming) {
       return;
     }
     if (inputValue.trim()) {
@@ -77,7 +78,7 @@ export default function ChatInput({ onSubmit, disabled }: Props) {
             name="agentId"
             value={agentId}
             onChange={handleAgentChange}
-            disabled={disabled}
+            disabled={streaming}
             className="border border-gray-300 rounded p-2 text-black"
           >
             {groups.map((group) => (
@@ -98,17 +99,23 @@ export default function ChatInput({ onSubmit, disabled }: Props) {
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          disabled={disabled}
+          disabled={streaming}
           rows={1}
           style={{ maxHeight: "7rem" }}
         />
-        <button
-          type="submit"
-          disabled={disabled}
-          className="bg-blue-500 text-white rounded p-2 disabled:opacity-50"
-        >
-          Send message
-        </button>
+        {streaming ? (
+          <button
+            type="button"
+            onClick={onStop}
+            className="bg-gray-600 text-white rounded p-2"
+          >
+            Stop
+          </button>
+        ) : (
+          <button type="submit" className="bg-blue-500 text-white rounded p-2">
+            Send message
+          </button>
+        )}
       </form>
     </div>
   );

@@ -77,6 +77,7 @@ test.describe("live provider smoke", () => {
     const body = await response.text();
     expect(response.ok(), body).toBeTruthy();
     const messages = readDoneMessages(body);
+    expect(Array.isArray(messages)).toBe(true);
     const assistant = (messages as { role: string; content?: string }[]).find(
       (m) => m.role === "assistant",
     );

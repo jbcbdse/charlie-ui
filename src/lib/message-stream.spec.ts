@@ -9,8 +9,10 @@ import {
 import {
   applyStreamChunk,
   consumeChatRun,
+  createNdjsonStream,
   encodeStreamEvent,
   emptyStreamPreview,
+  listenChatRun,
   mergeStreamedThoughts,
   parseStreamLine,
   readMessageStream,
@@ -28,7 +30,7 @@ describe("applyStreamChunk", () => {
       index: 0,
       name: "CalculatorTool",
     });
-    expect(preview).toEqual({ thinking: "hmm yes", text: "Hi there" });
+    expect(preview).toEqual({ thinking: "hmm yes", text: "" });
   });
 });
 
@@ -95,10 +97,8 @@ describe("stream codec", () => {
     expect(parseStreamLine(" \n")).toBeNull();
   });
 
-  it("rejects unknown payloads", () => {
-    expect(() => parseStreamLine(JSON.stringify({ type: "nope" }))).toThrow(
-      "Unexpected response from message API",
-    );
+  it("skips unknown event types", () => {
+    expect(parseStreamLine(JSON.stringify({ type: "usage" }))).toBeNull();
   });
 });
 
@@ -123,6 +123,18 @@ describe("readMessageStream", () => {
       { type: "done", messages: [] },
     ]);
   });
+
+  it("maps a truncated line to Connection lost", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"type":"chunk","chun'));
+        controller.close();
+      },
+    });
+    await expect(readMessageStream(stream, () => undefined)).rejects.toThrow(
+      "Connection lost",
+    );
+  });
 });
 
 describe("consumeChatRun", () => {
@@ -144,6 +156,90 @@ describe("consumeChatRun", () => {
       { type: "text", text: "b" },
     ]);
     expect(messages).toEqual(output.responseMessages);
+  });
+});
+
+describe("listenChatRun", () => {
+  it("replays chunks if subscribe happens after the run emits", async () => {
+    const producer = new EventProducer();
+    const output = {
+      responseMessage: { role: "assistant" as const, content: "Hi" },
+      responseMessages: [{ role: "assistant" as const, content: "Hi" }],
+    };
+    const run = new ChatRunGenerator(producer, "run", async () => {
+      producer.emit(EventName.ChatStreamChunk, streamEvent(producer, "a"));
+      producer.emit(EventName.ChatStreamChunk, streamEvent(producer, "b"));
+      return output;
+    }).create();
+    const listening = listenChatRun(run);
+    await Promise.resolve();
+    const chunks: StreamChunk[] = [];
+    listening.subscribe((chunk) => chunks.push(chunk));
+    await expect(listening.messages()).resolves.toEqual(output.responseMessages);
+    expect(chunks).toEqual([
+      { type: "text", text: "a" },
+      { type: "text", text: "b" },
+    ]);
+  });
+});
+
+describe("createNdjsonStream", () => {
+  it("still emits buffered chunks when the stream starts after the run", async () => {
+    const producer = new EventProducer();
+    const output = {
+      responseMessage: { role: "assistant" as const, content: "Hi" },
+      responseMessages: [{ role: "assistant" as const, content: "Hi" }],
+    };
+    const run = new ChatRunGenerator(producer, "run", async () => {
+      producer.emit(EventName.ChatStreamChunk, streamEvent(producer, "a"));
+      return output;
+    }).create();
+    const listening = listenChatRun(run);
+    await Promise.resolve();
+    const stream = createNdjsonStream({
+      listening,
+      complete: () => listening.messages(),
+    });
+    const received: unknown[] = [];
+    await readMessageStream(stream, (event) => received.push(event));
+    expect(received).toEqual([
+      { type: "chunk", chunk: { type: "text", text: "a" } },
+      { type: "done", messages: output.responseMessages },
+    ]);
+  });
+
+  it("does not throw when cancelled before complete", async () => {
+    const producer = new EventProducer();
+    const output = {
+      responseMessage: { role: "assistant" as const, content: "Hi" },
+      responseMessages: [{ role: "assistant" as const, content: "Hi" }],
+    };
+    const run = new ChatRunGenerator(producer, "run", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return output;
+    }).create();
+    const listening = listenChatRun(run);
+    const stream = createNdjsonStream({
+      listening,
+      complete: () => listening.messages(),
+    });
+    await stream.cancel();
+    await expect(listening.messages()).resolves.toEqual(output.responseMessages);
+  });
+
+  it("writes an error event when complete rejects", async () => {
+    const producer = new EventProducer();
+    const run = new ChatRunGenerator(producer, "run", async () => {
+      throw new Error("nope");
+    }).create();
+    const listening = listenChatRun(run);
+    const stream = createNdjsonStream({
+      listening,
+      complete: () => listening.messages(),
+    });
+    const received: unknown[] = [];
+    await readMessageStream(stream, (event) => received.push(event));
+    expect(received).toEqual([{ type: "error", error: "nope" }]);
   });
 });
 

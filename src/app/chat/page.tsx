@@ -2,7 +2,7 @@
 import MessageList from '@/app/components/MessageList';
 import ChatInput from '@/app/components/ChatInput';
 import PageCard from '@/app/components/PageCard';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChatMessage, MessageUser } from '@jbcbdse/charlie-core';
 import { generateUniqueString } from '@/lib/generate-unique-string';
 import { clearMessages, getMessages, sendMessage } from '@/lib/send-message';
@@ -31,6 +31,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [stream, setStream] = useState<StreamPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -49,6 +50,7 @@ export default function ChatPage() {
 
   const handleClear = async () => {
     try {
+      abortRef.current?.abort();
       await clearMessages(uniqueId);
       setMessages([]);
       setStream(null);
@@ -56,6 +58,10 @@ export default function ChatPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to clear messages");
     }
+  };
+
+  const handleStop = () => {
+    abortRef.current?.abort();
   };
 
   const handleSendMessage = async ({
@@ -77,6 +83,8 @@ export default function ChatPage() {
     setStream(emptyStreamPreview());
     setError(null);
     let preview = emptyStreamPreview();
+    const abort = new AbortController();
+    abortRef.current = abort;
     try {
       const response = await sendMessage(
         {
@@ -85,6 +93,7 @@ export default function ChatPage() {
           message: newMessage,
         },
         {
+          signal: abort.signal,
           onChunk: (chunk) => {
             preview = applyStreamChunk(preview, chunk);
             setStream({ ...preview });
@@ -98,7 +107,14 @@ export default function ChatPage() {
       setStream(null);
     } catch (err) {
       setStream(null);
+      if (isAbortError(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      if (abortRef.current === abort) {
+        abortRef.current = null;
+      }
     }
   };
 
@@ -109,11 +125,19 @@ export default function ChatPage() {
         {error ? (
           <div className="text-red-600 text-center text-sm px-4">{error}</div>
         ) : null}
-        <ChatInput onSubmit={handleSendMessage} disabled={!!stream} />
+        <ChatInput
+          onSubmit={handleSendMessage}
+          onStop={handleStop}
+          streaming={!!stream}
+        />
       </div>
       <div className="mt-4 text-gray-600 text-center">
         Your unique ID: {uniqueId}
       </div>
     </PageCard>
   );
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
 }

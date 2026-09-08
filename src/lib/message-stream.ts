@@ -15,6 +15,11 @@ export type StreamPreview = {
   text: string;
 };
 
+export type ChatRunListener = {
+  subscribe(listener: (chunk: StreamChunk) => void): () => void;
+  messages(): Promise<ChatMessage[]>;
+};
+
 export const STREAM_CONTENT_TYPE = "application/x-ndjson; charset=utf-8";
 
 export function emptyStreamPreview(): StreamPreview {
@@ -30,6 +35,9 @@ export function applyStreamChunk(
   }
   if (chunk.type === "text") {
     return { ...preview, text: preview.text + chunk.text };
+  }
+  if (chunk.type === "tool_call") {
+    return { ...preview, text: "" };
   }
   return preview;
 }
@@ -57,8 +65,11 @@ export function parseStreamLine(line: string): MessageStreamEvent | null {
     return null;
   }
   const parsed: unknown = JSON.parse(trimmed);
-  if (!isMessageStreamEvent(parsed)) {
+  if (!parsed || typeof parsed !== "object") {
     throw new Error("Unexpected response from message API");
+  }
+  if (!isMessageStreamEvent(parsed)) {
+    return null;
   }
   return parsed;
 }
@@ -70,30 +81,123 @@ export async function readMessageStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      buffer = flushLines(buffer, onEvent);
     }
-    buffer += decoder.decode(value, { stream: true });
-    buffer = flushLines(buffer, onEvent);
+    buffer += decoder.decode();
+    const last = parseStreamLine(buffer);
+    if (last) {
+      onEvent(last);
+    }
+  } catch (error) {
+    try {
+      await reader.cancel();
+    } catch {
+      /* already cancelled */
+    }
+    if (error instanceof SyntaxError) {
+      throw new Error("Connection lost");
+    }
+    throw error;
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      /* already released */
+    }
   }
-  buffer += decoder.decode();
-  const last = parseStreamLine(buffer);
-  if (last) {
-    onEvent(last);
-  }
+}
+
+export function listenChatRun(run: ChatRun): ChatRunListener {
+  const chunks: StreamChunk[] = [];
+  const listeners = new Set<(chunk: StreamChunk) => void>();
+  run.on(EventName.ChatStreamChunk, ({ chunk }) => {
+    chunks.push(chunk);
+    for (const listener of listeners) {
+      listener(chunk);
+    }
+  });
+  return {
+    subscribe(listener) {
+      const start = chunks.length;
+      listeners.add(listener);
+      for (let i = 0; i < start; i++) {
+        listener(chunks[i]);
+      }
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    async messages() {
+      const result = await run;
+      return result.responseMessages;
+    },
+  };
 }
 
 export async function consumeChatRun(
   run: ChatRun,
   onChunk: (chunk: StreamChunk) => void,
 ): Promise<ChatMessage[]> {
-  run.on(EventName.ChatStreamChunk, ({ chunk }) => {
-    onChunk(chunk);
+  const listening = listenChatRun(run);
+  listening.subscribe(onChunk);
+  return listening.messages();
+}
+
+export function createNdjsonStream(args: {
+  listening: ChatRunListener;
+  complete: () => Promise<ChatMessage[]>;
+}): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let closed = false;
+  return new ReadableStream({
+    async start(controller) {
+      const write = (event: MessageStreamEvent) => {
+        if (closed) {
+          return;
+        }
+        try {
+          controller.enqueue(encoder.encode(encodeStreamEvent(event)));
+        } catch {
+          closed = true;
+        }
+      };
+      const unsubscribe = args.listening.subscribe((chunk) => {
+        write({ type: "chunk", chunk });
+      });
+      try {
+        const messages = await args.complete();
+        write({ type: "done", messages });
+        if (!closed) {
+          closed = true;
+          controller.close();
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Request failed";
+        write({ type: "error", error: errorMessage });
+        if (!closed) {
+          try {
+            controller.close();
+          } catch {
+            /* already cancelled */
+          }
+          closed = true;
+        }
+      } finally {
+        unsubscribe();
+      }
+    },
+    cancel() {
+      closed = true;
+    },
   });
-  const result = await run;
-  return result.responseMessages;
 }
 
 function flushLines(
@@ -112,8 +216,8 @@ function flushLines(
   return buffer;
 }
 
-function isMessageStreamEvent(value: unknown): value is MessageStreamEvent {
-  if (!value || typeof value !== "object" || !("type" in value)) {
+function isMessageStreamEvent(value: object): value is MessageStreamEvent {
+  if (!("type" in value)) {
     return false;
   }
   if (value.type === "chunk") {

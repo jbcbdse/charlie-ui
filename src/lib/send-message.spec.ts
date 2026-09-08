@@ -79,4 +79,47 @@ describe("sendMessage", () => {
       }),
     ).rejects.toThrow("boom");
   });
+
+  it("aborts when the signal fires", async () => {
+    const abort = new AbortController();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const signal = init?.signal;
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              const onAbort = () => {
+                try {
+                  controller.error(new DOMException("Aborted", "AbortError"));
+                } catch {
+                  /* already closed */
+                }
+              };
+              if (signal?.aborted) {
+                onAbort();
+                return;
+              }
+              signal?.addEventListener("abort", onAbort, { once: true });
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/x-ndjson" },
+          },
+        );
+      }),
+    );
+    setTimeout(() => abort.abort(), 10);
+    await expect(
+      sendMessage(
+        {
+          user: { id: "u1" },
+          agent: "gpt4o",
+          message: { content: "hi" },
+        },
+        { signal: abort.signal },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
 });

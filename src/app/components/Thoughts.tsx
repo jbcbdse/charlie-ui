@@ -11,7 +11,7 @@ export default function Thoughts({ content, open }: Props) {
     <div className="flex justify-start my-2">
       <details
         className="max-w-3xl w-full bg-gray-100 text-gray-700 rounded-lg p-3"
-        {...(open ? { open: true } : {})}
+        {...(open ? { defaultOpen: true } : {})}
       >
         <summary className="cursor-pointer text-xs font-semibold select-none">
           Thoughts

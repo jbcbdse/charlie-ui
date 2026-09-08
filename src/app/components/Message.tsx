@@ -7,7 +7,7 @@ type Props = {
   message: ChatMessage;
   streaming?: boolean;
 }
-export default function Message({message, streaming}: Props) {
+function Message({message, streaming}: Props) {
   if (message.role === "reasoning") {
     return <Thoughts content={message.content ?? ""} />;
   }
@@ -49,3 +49,5 @@ export default function Message({message, streaming}: Props) {
     </div>
   )
 }
+
+export default React.memo(Message);
