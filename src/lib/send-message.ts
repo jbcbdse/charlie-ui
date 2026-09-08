@@ -1,4 +1,5 @@
-import { ChatMessage } from "@jbcbdse/charlie-core";
+import { ChatMessage, StreamChunk } from "@jbcbdse/charlie-core";
+import { readMessageStream } from "./message-stream";
 
 async function parseJson(response: Response): Promise<unknown> {
   const data = await response.json().catch(() => ({}));
@@ -15,23 +16,53 @@ async function parseJson(response: Response): Promise<unknown> {
   return data;
 }
 
-export async function sendMessage(body: {
-  user: { id: string };
-  agent: string;
-  message: { content: string };
-}): Promise<ChatMessage[]> {
+export async function sendMessage(
+  body: {
+    user: { id: string };
+    agent: string;
+    message: { content: string };
+  },
+  options?: {
+    onChunk?: (chunk: StreamChunk) => void;
+    signal?: AbortSignal;
+  },
+): Promise<ChatMessage[]> {
   const response = await fetch(`/api/message/${body.user.id}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
-  const data = await parseJson(response);
-  if (!Array.isArray(data)) {
+  if (!response.ok) {
+    await parseJson(response);
+    throw new Error(`Request failed (${response.status})`);
+  }
+  if (!response.body) {
     throw new Error("Unexpected response from message API");
   }
-  return data as ChatMessage[];
+
+  let doneMessages: ChatMessage[] | undefined;
+  let streamError: string | undefined;
+  await readMessageStream(response.body, (event) => {
+    if (event.type === "chunk") {
+      options?.onChunk?.(event.chunk);
+      return;
+    }
+    if (event.type === "done") {
+      doneMessages = event.messages;
+      return;
+    }
+    streamError = event.error;
+  });
+  if (streamError) {
+    throw new Error(streamError);
+  }
+  if (!doneMessages) {
+    throw new Error("Unexpected response from message API");
+  }
+  return doneMessages;
 }
 
 export async function getMessages(userId: string): Promise<ChatMessage[]> {

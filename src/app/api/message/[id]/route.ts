@@ -8,6 +8,15 @@ import {
   saveMesssages,
 } from "@/lib/file-memory";
 import { isAvailableAgent } from "@/lib/available-agents";
+import {
+  STREAM_CONTENT_TYPE,
+  createNdjsonStream,
+  listenChatRun,
+} from "@/lib/message-stream";
+import { ChatMessage } from "@jbcbdse/charlie-core";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(
   req: NextRequest,
@@ -30,21 +39,34 @@ export async function POST(
     }
 
     const agent = agents[agentId];
-    const response = await agent.getResponse({
+    const history = await getMessages(userId);
+    const run = agent.getResponse({
       tools: getTools(),
       meta: {
-        user: { id: userId, ...(body.user ?? {}) },
+        user: { ...(body.user ?? {}), id: userId },
       },
-      messages: [...(await getMessages(userId)), message],
+      messages: [...history, message],
     });
-    const responseMessages = response.responseMessages;
-    responseMessages
-      .filter((m) => m.role === "assistant")
-      .forEach((m) => {
-        m.name ??= agentId;
-      });
-    await saveMesssages(userId, [message, ...responseMessages]);
-    return NextResponse.json(responseMessages);
+    const listening = listenChatRun(run);
+
+    return new Response(
+      createNdjsonStream({
+        listening,
+        complete: async () => {
+          const responseMessages = await listening.messages();
+          tagAssistant(responseMessages, agentId);
+          await saveMesssages(userId, [message, ...responseMessages]);
+          return responseMessages;
+        },
+      }),
+      {
+        headers: {
+          "Content-Type": STREAM_CONTENT_TYPE,
+          "Cache-Control": "no-cache, no-transform",
+          "X-Accel-Buffering": "no",
+        },
+      },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed";
     const status = message === "Invalid user id" ? 400 : 500;
@@ -80,4 +102,12 @@ export async function DELETE(
     const status = message === "Invalid user id" ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
+}
+
+function tagAssistant(messages: ChatMessage[], agentId: string): void {
+  messages
+    .filter((m) => m.role === "assistant")
+    .forEach((m) => {
+      m.name ??= agentId;
+    });
 }

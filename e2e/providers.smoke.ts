@@ -1,5 +1,6 @@
 import { APIRequestContext, expect, test } from "@playwright/test";
 import { randomUUID } from "crypto";
+import { parseStreamLine } from "../src/lib/message-stream";
 
 const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
 const ollamaUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1";
@@ -11,6 +12,21 @@ async function ollamaIsUp(request: APIRequestContext): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function readDoneMessages(text: string): unknown {
+  let messages: unknown;
+  for (const line of text.split("\n")) {
+    const event = parseStreamLine(line);
+    if (!event) continue;
+    if (event.type === "error") {
+      throw new Error(event.error);
+    }
+    if (event.type === "done") {
+      messages = event.messages;
+    }
+  }
+  return messages;
 }
 
 test.describe("live provider smoke", () => {
@@ -31,11 +47,12 @@ test.describe("live provider smoke", () => {
       timeout: 180_000,
     });
 
-    expect(response.ok(), await response.text()).toBeTruthy();
-    const messages = await response.json();
+    const body = await response.text();
+    expect(response.ok(), body).toBeTruthy();
+    const messages = readDoneMessages(body);
     expect(Array.isArray(messages)).toBe(true);
-    const assistant = messages.find(
-      (m: { role: string }) => m.role === "assistant",
+    const assistant = (messages as { role: string; content?: string }[]).find(
+      (m) => m.role === "assistant",
     );
     expect(assistant?.content).toBeTruthy();
   });
@@ -57,10 +74,12 @@ test.describe("live provider smoke", () => {
       timeout: 60_000,
     });
 
-    expect(response.ok(), await response.text()).toBeTruthy();
-    const messages = await response.json();
-    const assistant = messages.find(
-      (m: { role: string }) => m.role === "assistant",
+    const body = await response.text();
+    expect(response.ok(), body).toBeTruthy();
+    const messages = readDoneMessages(body);
+    expect(Array.isArray(messages)).toBe(true);
+    const assistant = (messages as { role: string; content?: string }[]).find(
+      (m) => m.role === "assistant",
     );
     expect(assistant?.content).toBeTruthy();
   });
