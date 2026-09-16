@@ -8,7 +8,12 @@ import {
   listenChatRun,
 } from "@/lib/message-stream";
 import { ChatMessage, MessageUser } from "@jbcbdse/charlie-core";
-import { chatMemory, jsonError, userEmailFrom } from "@/lib/chat-route";
+import {
+  chatMemory,
+  jsonError,
+  userEmailFrom,
+  userSettings,
+} from "@/lib/chat-route";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -59,13 +64,16 @@ export async function POST(
     const message: MessageUser = { role: "user", name: "User", content };
 
     const memory = await chatMemory();
+    const settings = await userSettings();
     const history = await memory.getMessages(email, chatId);
+    const { systemPromptTemplate } = await settings.get(email);
     await memory.appendMessages(email, chatId, [message]);
     const agent = agents[agentId];
     const run = agent.getResponse({
       tools: getTools(),
       meta: {
         user: { id: email, email },
+        systemPromptTemplate,
       },
       messages: [...history, message],
     });

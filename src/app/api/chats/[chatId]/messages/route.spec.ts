@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   appendMessages: vi.fn(),
   getMessages: vi.fn(),
   getResponse: vi.fn(),
+  getSettings: vi.fn(),
 }));
 
 vi.mock("@/lib/agents", () => ({
@@ -18,6 +19,9 @@ vi.mock("@/lib/chat-route", () => ({
   chatMemory: async () => ({
     appendMessages: mocks.appendMessages,
     getMessages: mocks.getMessages,
+  }),
+  userSettings: async () => ({
+    get: mocks.getSettings,
   }),
   jsonError: (error: unknown) =>
     Response.json(
@@ -59,6 +63,11 @@ describe("POST chat message", () => {
     mocks.getMessages.mockResolvedValue([]);
     mocks.getResponse.mockReturnValue({});
     mocks.appendMessages.mockResolvedValue(undefined);
+    mocks.getSettings.mockResolvedValue({
+      systemPromptId: "rude",
+      customSystemPrompt: "",
+      systemPromptTemplate: "You are rude {{user}}",
+    });
   });
 
   it("persists a server-created user message before starting the run", async () => {
@@ -85,6 +94,14 @@ describe("POST chat message", () => {
     );
     expect(mocks.appendMessages.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.getResponse.mock.invocationCallOrder[0],
+    );
+    expect(mocks.getResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meta: {
+          user: { id: "user@example.com", email: "user@example.com" },
+          systemPromptTemplate: "You are rude {{user}}",
+        },
+      }),
     );
   });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getChatMemory } from "./mongo";
+import { getChatMemory, getUserSettingsStore } from "./mongo";
 
 export function userEmailFrom(req: NextRequest): string {
   return req.headers.get("x-user-email") ?? "";
@@ -9,10 +9,16 @@ export async function chatMemory() {
   return getChatMemory();
 }
 
+export async function userSettings() {
+  return getUserSettingsStore();
+}
+
 export function jsonError(error: unknown): NextResponse {
   const message = error instanceof Error ? error.message : "Request failed";
   const status =
-    message === "Invalid email" || message === "Invalid chat id"
+    message === "Invalid email" ||
+    message === "Invalid chat id" ||
+    message === "Invalid system prompt"
       ? 400
       : message === "Chat not found"
         ? 404

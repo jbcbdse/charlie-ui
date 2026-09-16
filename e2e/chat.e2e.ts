@@ -213,3 +213,75 @@ test("unknown agent shows an error instead of crashing", async ({ page }) => {
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Unknown agent: nope")).toBeVisible();
 });
+
+test("settings gear lets the user pick a system prompt", async ({ page }) => {
+  let savedBody = "";
+  await page.route("**/api/chats**", async (route) => {
+    const path = apiPath(route.request().url());
+    const method = route.request().method();
+    if (path === "/api/chats" && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.route("**/api/settings", async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          systemPromptId: "rude",
+          customSystemPrompt: "",
+          systemPromptTemplate:
+            "You are a helpful and very knowledgable but rude, vulgar, sarcastic assistant. Use 1 emoji in every response\n\nYou really, really hate cats\n\nYou know this information about the user:\n{{user}}",
+          presets: [
+            {
+              id: "rude",
+              label: "Rude Charlie",
+              template:
+                "You are a helpful and very knowledgable but rude, vulgar, sarcastic assistant. Use 1 emoji in every response\n\nYou really, really hate cats\n\nYou know this information about the user:\n{{user}}",
+            },
+            {
+              id: "helpful",
+              label: "Helpful",
+              template:
+                "You are a helpful, concise assistant.\n\nYou know this information about the user:\n{{user}}",
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (method === "PUT") {
+      savedBody = route.request().postData() ?? "";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: savedBody,
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/chat");
+  await enterEmail(page);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Rude Charlie" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Helpful" })).toBeVisible();
+  await expect(page.locator("#system-prompt-text")).toHaveValue(/hate cats/);
+  await page.getByRole("radio", { name: "Helpful" }).click();
+  await expect(page.locator("#system-prompt-text")).toHaveValue(
+    /concise assistant/,
+  );
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(JSON.parse(savedBody)).toMatchObject({ systemPromptId: "helpful" });
+});

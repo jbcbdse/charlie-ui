@@ -1,6 +1,7 @@
 import { ChatMessage, StreamChunk } from "@jbcbdse/charlie-core";
 import { readMessageStream } from "./message-stream";
 import { ChatSummary, ChatWithMessages } from "./chat-types";
+import { SettingsPayload } from "./system-prompts";
 
 const EMAIL_HEADER = "x-user-email";
 
@@ -144,4 +145,23 @@ export async function clearMessages(
     headers: { [EMAIL_HEADER]: email },
   });
   await parseJson(response);
+}
+
+export async function getSettings(email: string): Promise<SettingsPayload> {
+  const response = await fetch("/api/settings", {
+    headers: { [EMAIL_HEADER]: email },
+  });
+  return (await parseJson(response)) as SettingsPayload;
+}
+
+export async function saveSettings(
+  email: string,
+  body: { systemPromptId: string; customSystemPrompt: string },
+): Promise<SettingsPayload> {
+  const response = await fetch("/api/settings", {
+    method: "PUT",
+    headers: jsonHeaders(email),
+    body: JSON.stringify(body),
+  });
+  return (await parseJson(response)) as SettingsPayload;
 }

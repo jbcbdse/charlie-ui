@@ -1,5 +1,6 @@
 import { MongoClient } from "mongodb";
 import { ChatMemory, ChatDocument, MessageDocument } from "./chat-memory";
+import { UserSettingsDocument, UserSettingsStore } from "./user-settings";
 
 const globalForMongo = globalThis as unknown as {
   mongoConnect?: Promise<MongoClient>;
@@ -25,18 +26,39 @@ async function getClient(): Promise<MongoClient> {
   return globalForMongo.mongoConnect;
 }
 
-export async function getChatMemory(): Promise<ChatMemory> {
+async function getDb() {
   const db = (await getClient()).db();
-  const memory = new ChatMemory(
+  if (!globalForMongo.mongoIndexes) {
+    const memory = new ChatMemory(
+      db.collection<ChatDocument>("chats"),
+      db.collection<MessageDocument>("messages"),
+    );
+    const settings = new UserSettingsStore(
+      db.collection<UserSettingsDocument>("usersettings"),
+    );
+    globalForMongo.mongoIndexes = Promise.all([
+      memory.ensureIndexes(),
+      settings.ensureIndexes(),
+    ])
+      .then(() => undefined)
+      .catch((error) => {
+        globalForMongo.mongoIndexes = undefined;
+        throw error;
+      });
+  }
+  await globalForMongo.mongoIndexes;
+  return db;
+}
+
+export async function getChatMemory(): Promise<ChatMemory> {
+  const db = await getDb();
+  return new ChatMemory(
     db.collection<ChatDocument>("chats"),
     db.collection<MessageDocument>("messages"),
   );
-  if (!globalForMongo.mongoIndexes) {
-    globalForMongo.mongoIndexes = memory.ensureIndexes().catch((error) => {
-      globalForMongo.mongoIndexes = undefined;
-      throw error;
-    });
-  }
-  await globalForMongo.mongoIndexes;
-  return memory;
+}
+
+export async function getUserSettingsStore(): Promise<UserSettingsStore> {
+  const db = await getDb();
+  return new UserSettingsStore(db.collection<UserSettingsDocument>("usersettings"));
 }
