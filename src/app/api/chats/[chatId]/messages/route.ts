@@ -7,7 +7,7 @@ import {
   createNdjsonStream,
   listenChatRun,
 } from "@/lib/message-stream";
-import { ChatMessage } from "@jbcbdse/charlie-core";
+import { ChatMessage, MessageUser } from "@jbcbdse/charlie-core";
 import { chatMemory, jsonError, userEmailFrom } from "@/lib/chat-route";
 
 export const dynamic = "force-dynamic";
@@ -34,26 +34,38 @@ export async function POST(
   try {
     const { chatId } = await params;
     const email = userEmailFrom(req);
-    const body = await req.json();
-    const agentId = body.agent as string;
+    const body: unknown = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    const request = body as {
+      agent?: unknown;
+      message?: { content?: unknown };
+    };
+    const agentId = request.agent;
+    if (typeof agentId !== "string") {
+      return NextResponse.json({ error: "Invalid agent" }, { status: 400 });
+    }
     if (!isAvailableAgent(agentId)) {
       return NextResponse.json(
         { error: `Unknown agent: ${agentId}` },
         { status: 400 },
       );
     }
-    const message = body.message;
-    if (!message || typeof message.content !== "string") {
+    const content = request.message?.content;
+    if (typeof content !== "string") {
       return NextResponse.json({ error: "Invalid message" }, { status: 400 });
     }
+    const message: MessageUser = { role: "user", name: "User", content };
 
     const memory = await chatMemory();
     const history = await memory.getMessages(email, chatId);
+    await memory.appendMessages(email, chatId, [message]);
     const agent = agents[agentId];
     const run = agent.getResponse({
       tools: getTools(),
       meta: {
-        user: { ...(body.user ?? {}), id: email, email },
+        user: { id: email, email },
       },
       messages: [...history, message],
     });
@@ -65,10 +77,7 @@ export async function POST(
         complete: async () => {
           const responseMessages = await listening.messages();
           tagAssistant(responseMessages, agentId);
-          await memory.appendMessages(email, chatId, [
-            message,
-            ...responseMessages,
-          ]);
+          await memory.appendMessages(email, chatId, responseMessages);
           return responseMessages;
         },
       }),

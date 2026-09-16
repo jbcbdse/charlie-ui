@@ -23,18 +23,29 @@ export default function ChatConversationPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchChat = async () => {
       try {
         abortRef.current?.abort();
         const chat = await getChat(email, chatId);
+        if (cancelled) {
+          return;
+        }
         setMessages(chat.messages);
         setStream(null);
         setError(null);
       } catch (err) {
+        if (cancelled) {
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Failed to load chat');
       }
     };
     fetchChat();
+    return () => {
+      cancelled = true;
+      abortRef.current?.abort();
+    };
   }, [email, chatId]);
 
   const handleClear = async () => {

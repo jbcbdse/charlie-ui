@@ -71,6 +71,7 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(EMAIL_KEY);
     setEmail(null);
     setChats([]);
+    setError(null);
     router.push('/chat');
   };
 

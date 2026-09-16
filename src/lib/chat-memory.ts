@@ -76,17 +76,19 @@ export class ChatMemory {
   }
 
   async deleteChat(userEmail: string, chatId: string): Promise<boolean> {
-    const email = this.assertEmail(userEmail);
-    const id = this.assertChatId(chatId);
-    const result = await this.chats.deleteOne({
-      _id: id,
-      userEmail: email,
-    });
-    if (result.deletedCount === 0) {
+    const chat = await this.findChat(userEmail, chatId);
+    if (!chat) {
       return false;
     }
-    await this.messages.deleteMany({ chatId: id, userEmail: email });
-    return true;
+    await this.messages.deleteMany({
+      chatId: chat._id,
+      userEmail: chat.userEmail,
+    });
+    const result = await this.chats.deleteOne({
+      _id: chat._id,
+      userEmail: chat.userEmail,
+    });
+    return result.deletedCount > 0;
   }
 
   async getMessages(

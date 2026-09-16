@@ -17,7 +17,10 @@ function mongoUri(): string {
 async function getClient(): Promise<MongoClient> {
   if (!globalForMongo.mongoConnect) {
     const client = new MongoClient(mongoUri());
-    globalForMongo.mongoConnect = client.connect();
+    globalForMongo.mongoConnect = client.connect().catch((error) => {
+      globalForMongo.mongoConnect = undefined;
+      throw error;
+    });
   }
   return globalForMongo.mongoConnect;
 }
@@ -29,7 +32,10 @@ export async function getChatMemory(): Promise<ChatMemory> {
     db.collection<MessageDocument>("messages"),
   );
   if (!globalForMongo.mongoIndexes) {
-    globalForMongo.mongoIndexes = memory.ensureIndexes();
+    globalForMongo.mongoIndexes = memory.ensureIndexes().catch((error) => {
+      globalForMongo.mongoIndexes = undefined;
+      throw error;
+    });
   }
   await globalForMongo.mongoIndexes;
   return memory;

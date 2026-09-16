@@ -17,5 +17,11 @@ export function jsonError(error: unknown): NextResponse {
       : message === "Chat not found"
         ? 404
         : 500;
-  return NextResponse.json({ error: message }, { status });
+  if (status === 500) {
+    console.error("Chat API request failed", error);
+  }
+  return NextResponse.json(
+    { error: status === 500 ? "Request failed" : message },
+    { status },
+  );
 }

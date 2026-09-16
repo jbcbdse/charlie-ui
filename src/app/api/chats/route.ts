@@ -16,8 +16,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const title = typeof body.title === "string" ? body.title : undefined;
+    const body: unknown = await req.json().catch(() => ({}));
+    const title =
+      body &&
+      typeof body === "object" &&
+      "title" in body &&
+      typeof body.title === "string"
+        ? body.title
+        : undefined;
     const memory = await chatMemory();
     const chat = await memory.createChat(userEmailFrom(req), title);
     return NextResponse.json(chat, { status: 201 });
