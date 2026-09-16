@@ -20,6 +20,7 @@
     "@jbcbdse/charlie-openai": "^1.0.0",
     "@ricky0123/vad-react": "^0.0.36",
     "expr-eval": "^2.0.2",
+    "mongodb": "^7.6.0",
     "next": "^15.5.25",
     "openai": "^6.39.0",
     "react": "^19.2.8",

@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { agents } from "@/lib/agents";
 import { getTools } from "@/lib/tools";
-import {
-  assertSafeUserId,
-  clearMessages,
-  getMessages,
-  saveMesssages,
-} from "@/lib/file-memory";
 import { isAvailableAgent } from "@/lib/available-agents";
 import {
   STREAM_CONTENT_TYPE,
@@ -14,17 +8,32 @@ import {
   listenChatRun,
 } from "@/lib/message-stream";
 import { ChatMessage } from "@jbcbdse/charlie-core";
+import { chatMemory, jsonError, userEmailFrom } from "@/lib/chat-route";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(
+export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ chatId: string }> },
 ) {
   try {
-    const { id: routeUserId } = await params;
-    const userId = assertSafeUserId(routeUserId);
+    const { chatId } = await params;
+    const memory = await chatMemory();
+    const messages = await memory.getMessages(userEmailFrom(req), chatId);
+    return NextResponse.json(messages);
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ chatId: string }> },
+) {
+  try {
+    const { chatId } = await params;
+    const email = userEmailFrom(req);
     const body = await req.json();
     const agentId = body.agent as string;
     if (!isAvailableAgent(agentId)) {
@@ -38,12 +47,13 @@ export async function POST(
       return NextResponse.json({ error: "Invalid message" }, { status: 400 });
     }
 
+    const memory = await chatMemory();
+    const history = await memory.getMessages(email, chatId);
     const agent = agents[agentId];
-    const history = await getMessages(userId);
     const run = agent.getResponse({
       tools: getTools(),
       meta: {
-        user: { ...(body.user ?? {}), id: userId },
+        user: { ...(body.user ?? {}), id: email, email },
       },
       messages: [...history, message],
     });
@@ -55,7 +65,10 @@ export async function POST(
         complete: async () => {
           const responseMessages = await listening.messages();
           tagAssistant(responseMessages, agentId);
-          await saveMesssages(userId, [message, ...responseMessages]);
+          await memory.appendMessages(email, chatId, [
+            message,
+            ...responseMessages,
+          ]);
           return responseMessages;
         },
       }),
@@ -68,39 +81,21 @@ export async function POST(
       },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Request failed";
-    const status = message === "Invalid user id" ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
-  }
-}
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const { id } = await params;
-    const messages = await getMessages(id);
-    return NextResponse.json(messages);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Request failed";
-    const status = message === "Invalid user id" ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return jsonError(error);
   }
 }
 
 export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  req: NextRequest,
+  { params }: { params: Promise<{ chatId: string }> },
 ) {
   try {
-    const { id } = await params;
-    await clearMessages(id);
+    const { chatId } = await params;
+    const memory = await chatMemory();
+    await memory.clearMessages(userEmailFrom(req), chatId);
     return NextResponse.json({});
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Request failed";
-    const status = message === "Invalid user id" ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return jsonError(error);
   }
 }
 
