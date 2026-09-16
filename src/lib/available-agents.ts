@@ -32,8 +32,7 @@ export const PROVIDERS = {
   ollama: {
     label: "Ollama",
     models: {
-      ollama: { label: "Qwen 3.5 9B" },
-      ollama35b: { label: "Qwen 3.6 35B" },
+      ollama: { label: "Gemma 4 12B" },
     },
   },
 } as const;
