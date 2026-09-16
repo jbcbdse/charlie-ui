@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sendMessage } from "./send-message";
 
+const request = {
+  email: "user@example.com",
+  chatId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+  agent: "gpt4o",
+  message: { content: "hi" },
+};
+
 describe("sendMessage", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -30,14 +37,9 @@ describe("sendMessage", () => {
       })),
     );
     const chunks: unknown[] = [];
-    const messages = await sendMessage(
-      {
-        user: { id: "u1" },
-        agent: "gpt4o",
-        message: { content: "hi" },
-      },
-      { onChunk: (chunk) => chunks.push(chunk) },
-    );
+    const messages = await sendMessage(request, {
+      onChunk: (chunk) => chunks.push(chunk),
+    });
     expect(chunks).toEqual([
       { type: "thinking", text: "hmm" },
       { type: "text", text: "partial" },
@@ -53,11 +55,7 @@ describe("sendMessage", () => {
       ),
     );
     await expect(
-      sendMessage({
-        user: { id: "u1" },
-        agent: "nope",
-        message: { content: "hi" },
-      }),
+      sendMessage({ ...request, agent: "nope" }),
     ).rejects.toThrow("Unknown agent: nope");
   });
 
@@ -71,13 +69,7 @@ describe("sendMessage", () => {
         }),
       ),
     );
-    await expect(
-      sendMessage({
-        user: { id: "u1" },
-        agent: "gpt4o",
-        message: { content: "hi" },
-      }),
-    ).rejects.toThrow("boom");
+    await expect(sendMessage(request)).rejects.toThrow("boom");
   });
 
   it("aborts when the signal fires", async () => {
@@ -112,14 +104,7 @@ describe("sendMessage", () => {
     );
     setTimeout(() => abort.abort(), 10);
     await expect(
-      sendMessage(
-        {
-          user: { id: "u1" },
-          agent: "gpt4o",
-          message: { content: "hi" },
-        },
-        { signal: abort.signal },
-      ),
+      sendMessage(request, { signal: abort.signal }),
     ).rejects.toMatchObject({ name: "AbortError" });
   });
 });

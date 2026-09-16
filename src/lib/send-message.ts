@@ -1,5 +1,8 @@
 import { ChatMessage, StreamChunk } from "@jbcbdse/charlie-core";
 import { readMessageStream } from "./message-stream";
+import { ChatSummary, ChatWithMessages } from "./chat-types";
+
+const EMAIL_HEADER = "x-user-email";
 
 async function parseJson(response: Response): Promise<unknown> {
   const data = await response.json().catch(() => ({}));
@@ -16,9 +19,61 @@ async function parseJson(response: Response): Promise<unknown> {
   return data;
 }
 
+function jsonHeaders(email: string): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    [EMAIL_HEADER]: email,
+  };
+}
+
+export async function listChats(email: string): Promise<ChatSummary[]> {
+  const response = await fetch("/api/chats", {
+    headers: { [EMAIL_HEADER]: email },
+  });
+  const data = await parseJson(response);
+  if (!Array.isArray(data)) {
+    throw new Error("Unexpected response from chats API");
+  }
+  return data as ChatSummary[];
+}
+
+export async function createChat(
+  email: string,
+  title?: string,
+): Promise<ChatSummary> {
+  const response = await fetch("/api/chats", {
+    method: "POST",
+    headers: jsonHeaders(email),
+    body: JSON.stringify(title ? { title } : {}),
+  });
+  return (await parseJson(response)) as ChatSummary;
+}
+
+export async function getChat(
+  email: string,
+  chatId: string,
+): Promise<ChatWithMessages> {
+  const response = await fetch(`/api/chats/${chatId}`, {
+    headers: { [EMAIL_HEADER]: email },
+  });
+  return (await parseJson(response)) as ChatWithMessages;
+}
+
+export async function deleteChat(
+  email: string,
+  chatId: string,
+): Promise<void> {
+  const response = await fetch(`/api/chats/${chatId}`, {
+    method: "DELETE",
+    headers: { [EMAIL_HEADER]: email },
+  });
+  await parseJson(response);
+}
+
 export async function sendMessage(
   body: {
-    user: { id: string };
+    email: string;
+    chatId: string;
     agent: string;
     message: { content: string };
   },
@@ -27,12 +82,13 @@ export async function sendMessage(
     signal?: AbortSignal;
   },
 ): Promise<ChatMessage[]> {
-  const response = await fetch(`/api/message/${body.user.id}`, {
+  const response = await fetch(`/api/chats/${body.chatId}/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+    headers: jsonHeaders(body.email),
+    body: JSON.stringify({
+      agent: body.agent,
+      message: body.message,
+    }),
     signal: options?.signal,
   });
   if (!response.ok) {
@@ -65,8 +121,13 @@ export async function sendMessage(
   return doneMessages;
 }
 
-export async function getMessages(userId: string): Promise<ChatMessage[]> {
-  const response = await fetch(`/api/message/${userId}`);
+export async function getMessages(
+  email: string,
+  chatId: string,
+): Promise<ChatMessage[]> {
+  const response = await fetch(`/api/chats/${chatId}/messages`, {
+    headers: { [EMAIL_HEADER]: email },
+  });
   const data = await parseJson(response);
   if (!Array.isArray(data)) {
     throw new Error("Unexpected response from message API");
@@ -74,9 +135,13 @@ export async function getMessages(userId: string): Promise<ChatMessage[]> {
   return data as ChatMessage[];
 }
 
-export async function clearMessages(userId: string): Promise<void> {
-  const response = await fetch(`/api/message/${userId}`, {
+export async function clearMessages(
+  email: string,
+  chatId: string,
+): Promise<void> {
+  const response = await fetch(`/api/chats/${chatId}/messages`, {
     method: "DELETE",
+    headers: { [EMAIL_HEADER]: email },
   });
   await parseJson(response);
 }

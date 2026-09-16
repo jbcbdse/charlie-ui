@@ -29,14 +29,27 @@ function readDoneMessages(text: string): unknown {
   return messages;
 }
 
+async function createChat(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const created = await request.post("/api/chats", {
+    headers: { "x-user-email": email },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const chat = (await created.json()) as { id: string };
+  return chat.id;
+}
+
 test.describe("live provider smoke", () => {
   test("ollama agent responds via message API", async ({ request }) => {
     test.skip(!(await ollamaIsUp(request)), "Ollama is not running on :11434");
 
-    const userId = `smoke-ollama-${randomUUID()}`;
-    const response = await request.post(`/api/message/${userId}`, {
+    const email = `smoke-ollama-${randomUUID()}@example.com`;
+    const chatId = await createChat(request, email);
+    const response = await request.post(`/api/chats/${chatId}/messages`, {
+      headers: { "x-user-email": email },
       data: {
-        user: { id: userId },
         agent: "ollama",
         message: {
           role: "user",
@@ -60,10 +73,11 @@ test.describe("live provider smoke", () => {
   test("openai gpt4o agent responds via message API", async ({ request }) => {
     test.skip(!hasOpenAI, "OPENAI_API_KEY not set");
 
-    const userId = `smoke-openai-${randomUUID()}`;
-    const response = await request.post(`/api/message/${userId}`, {
+    const email = `smoke-openai-${randomUUID()}@example.com`;
+    const chatId = await createChat(request, email);
+    const response = await request.post(`/api/chats/${chatId}/messages`, {
+      headers: { "x-user-email": email },
       data: {
-        user: { id: userId },
         agent: "gpt4o",
         message: {
           role: "user",

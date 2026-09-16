@@ -1,7 +1,56 @@
 import { expect, test } from "@playwright/test";
 
+const CHAT_ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
+const CHAT = {
+  id: CHAT_ID,
+  title: "New chat",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+function apiPath(url: string): string {
+  return new URL(url, "http://localhost").pathname.replace(/\/$/, "");
+}
+
+async function enterEmail(page: import("@playwright/test").Page) {
+  await page.locator("#email").fill("e2e@example.com");
+  await page.getByRole("button", { name: "Continue" }).click();
+}
+
 test("chat page shows provider-grouped model select", async ({ page }) => {
+  await page.route("**/api/chats**", async (route) => {
+    const path = apiPath(route.request().url());
+    const method = route.request().method();
+    if (path === "/api/chats" && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+      return;
+    }
+    if (path === "/api/chats" && method === "POST") {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(CHAT),
+      });
+      return;
+    }
+    if (path === `/api/chats/${CHAT_ID}` && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ...CHAT, messages: [] }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
   await page.goto("/chat");
+  await enterEmail(page);
+  await page.getByRole("button", { name: "New chat" }).click();
 
   const select = page.locator("#agentId");
   await expect(select).toBeVisible();
@@ -23,6 +72,12 @@ test("sending a message streams tokens then replaces with the complete reply", a
 }) => {
   await page.addInitScript(() => {
     const origFetch = window.fetch.bind(window);
+    const chat = {
+      id: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      title: "New chat",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
     window.fetch = async (input, init) => {
       const url =
         typeof input === "string"
@@ -32,18 +87,35 @@ test("sending a message streams tokens then replaces with the complete reply", a
             : input instanceof Request
               ? input.url
               : String(input);
+      const path = new URL(url, "http://localhost").pathname.replace(/\/$/, "");
       const method =
         init?.method ||
         (input instanceof Request ? input.method : "GET");
-      if (!url.includes("/api/message/")) {
+      if (!path.startsWith("/api/chats")) {
         return origFetch(input, init);
       }
-      if (method === "GET") {
+      if (path === "/api/chats" && method === "GET") {
+        return new Response(JSON.stringify([chat]), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (path === "/api/chats" && method === "POST") {
+        return new Response(JSON.stringify(chat), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (path === `/api/chats/${chat.id}` && method === "GET") {
+        return new Response(JSON.stringify({ ...chat, messages: [] }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (path.endsWith("/messages") && method === "GET") {
         return new Response("[]", {
           headers: { "content-type": "application/json" },
         });
       }
-      if (method === "POST") {
+      if (path.endsWith("/messages") && method === "POST") {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
           async start(controller) {
@@ -82,6 +154,8 @@ test("sending a message streams tokens then replaces with the complete reply", a
   });
 
   await page.goto("/chat");
+  await enterEmail(page);
+  await page.getByRole("button", { name: "New chat" }).click();
   await page.locator("textarea").fill("hello there");
   await page.getByRole("button", { name: "Send message" }).click();
 
@@ -94,16 +168,34 @@ test("sending a message streams tokens then replaces with the complete reply", a
 });
 
 test("unknown agent shows an error instead of crashing", async ({ page }) => {
-  await page.route("**/api/message/**", async (route) => {
-    if (route.request().method() === "GET") {
+  await page.route("**/api/chats**", async (route) => {
+    const path = apiPath(route.request().url());
+    const method = route.request().method();
+    if (path === "/api/chats" && method === "GET") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]",
+        body: JSON.stringify([]),
       });
       return;
     }
-    if (route.request().method() === "POST") {
+    if (path === "/api/chats" && method === "POST") {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(CHAT),
+      });
+      return;
+    }
+    if (path === `/api/chats/${CHAT_ID}` && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ...CHAT, messages: [] }),
+      });
+      return;
+    }
+    if (path.endsWith("/messages") && method === "POST") {
       await route.fulfill({
         status: 400,
         contentType: "application/json",
@@ -115,6 +207,8 @@ test("unknown agent shows an error instead of crashing", async ({ page }) => {
   });
 
   await page.goto("/chat");
+  await enterEmail(page);
+  await page.getByRole("button", { name: "New chat" }).click();
   await page.locator("textarea").fill("hello");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Unknown agent: nope")).toBeVisible();
