@@ -67,6 +67,7 @@ describe("settings API", () => {
     expect(mocks.save).toHaveBeenCalledWith("user@example.com", {
       systemPromptId: "helpful",
       customSystemPrompt: undefined,
+      mcpConfigJson: undefined,
     });
   });
 });

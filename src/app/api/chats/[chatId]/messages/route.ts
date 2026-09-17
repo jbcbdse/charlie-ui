@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { agents } from "@/lib/agents";
 import { getTools } from "@/lib/tools";
 import { isAvailableAgent } from "@/lib/available-agents";
+import { McpSessions } from "@jbcbdse/charlie-mcp";
+import { parseHttpMcpConfig } from "@/lib/mcp-config";
 import {
   STREAM_CONTENT_TYPE,
   createNdjsonStream,
@@ -66,37 +68,47 @@ export async function POST(
     const memory = await chatMemory();
     const settings = await userSettings();
     const history = await memory.getMessages(email, chatId);
-    const { systemPromptTemplate } = await settings.get(email);
+    const { systemPromptTemplate, mcpConfigJson } = await settings.get(email);
     await memory.appendMessages(email, chatId, [message]);
-    const agent = agents[agentId];
-    const run = agent.getResponse({
-      tools: getTools(),
-      meta: {
-        user: { id: email, email },
-        systemPromptTemplate,
-      },
-      messages: [...history, message],
-    });
-    const listening = listenChatRun(run);
+    const mcp = await connectMcp(mcpConfigJson);
+    try {
+      const agent = agents[agentId];
+      const run = agent.getResponse({
+        tools: [...getTools(), ...(mcp?.tools() ?? [])],
+        meta: {
+          user: { id: email, email },
+          systemPromptTemplate,
+        },
+        messages: [...history, message],
+      });
+      const listening = listenChatRun(run);
 
-    return new Response(
-      createNdjsonStream({
-        listening,
-        complete: async () => {
-          const responseMessages = await listening.messages();
-          tagAssistant(responseMessages, agentId);
-          await memory.appendMessages(email, chatId, responseMessages);
-          return responseMessages;
+      return new Response(
+        createNdjsonStream({
+          listening,
+          complete: async () => {
+            try {
+              const responseMessages = await listening.messages();
+              tagAssistant(responseMessages, agentId);
+              await memory.appendMessages(email, chatId, responseMessages);
+              return responseMessages;
+            } finally {
+              await mcp?.close();
+            }
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": STREAM_CONTENT_TYPE,
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+          },
         },
-      }),
-      {
-        headers: {
-          "Content-Type": STREAM_CONTENT_TYPE,
-          "Cache-Control": "no-cache, no-transform",
-          "X-Accel-Buffering": "no",
-        },
-      },
-    );
+      );
+    } catch (error) {
+      await mcp?.close();
+      throw error;
+    }
   } catch (error) {
     return jsonError(error);
   }
@@ -122,4 +134,12 @@ function tagAssistant(messages: ChatMessage[], agentId: string): void {
     .forEach((m) => {
       m.name ??= agentId;
     });
+}
+
+async function connectMcp(mcpConfigJson: string | undefined) {
+  const configs = parseHttpMcpConfig(mcpConfigJson ?? "");
+  if (!configs.length) {
+    return null;
+  }
+  return McpSessions.connect(configs);
 }

@@ -27,6 +27,7 @@ export async function PUT(req: NextRequest) {
     const request = body as {
       systemPromptId?: unknown;
       customSystemPrompt?: unknown;
+      mcpConfigJson?: unknown;
     };
     if (typeof request.systemPromptId !== "string") {
       return NextResponse.json(
@@ -43,10 +44,20 @@ export async function PUT(req: NextRequest) {
         { status: 400 },
       );
     }
+    if (
+      request.mcpConfigJson !== undefined &&
+      typeof request.mcpConfigJson !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Invalid MCP config" },
+        { status: 400 },
+      );
+    }
     const store = await userSettings();
     const settings = await store.save(userEmailFrom(req), {
       systemPromptId: request.systemPromptId,
       customSystemPrompt: request.customSystemPrompt,
+      mcpConfigJson: request.mcpConfigJson,
     });
     return NextResponse.json({
       ...settings,

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getMessages: vi.fn(),
   getResponse: vi.fn(),
   getSettings: vi.fn(),
+  connectMcp: vi.fn(),
+  closeMcp: vi.fn(),
 }));
 
 vi.mock("@/lib/agents", () => ({
@@ -30,6 +32,9 @@ vi.mock("@/lib/chat-route", () => ({
     ),
   userEmailFrom: (req: NextRequest) =>
     req.headers.get("x-user-email") ?? "",
+}));
+vi.mock("@jbcbdse/charlie-mcp", () => ({
+  McpSessions: { connect: mocks.connectMcp },
 }));
 vi.mock("@/lib/message-stream", () => ({
   STREAM_CONTENT_TYPE: "application/x-ndjson",
@@ -67,6 +72,7 @@ describe("POST chat message", () => {
       systemPromptId: "rude",
       customSystemPrompt: "",
       systemPromptTemplate: "You are rude {{user}}",
+      mcpConfigJson: "",
     });
   });
 
@@ -112,5 +118,42 @@ describe("POST chat message", () => {
 
     expect(response.status).toBe(400);
     expect(mocks.appendMessages).not.toHaveBeenCalled();
+  });
+
+  it("connects HTTP MCP servers from settings", async () => {
+    const mcpTool = { name: "local__echo" };
+    mocks.getSettings.mockResolvedValue({
+      systemPromptId: "rude",
+      customSystemPrompt: "",
+      systemPromptTemplate: "You are rude {{user}}",
+      mcpConfigJson: JSON.stringify({
+        mcpServers: { local: { url: "http://127.0.0.1:8787/mcp" } },
+      }),
+    });
+    mocks.connectMcp.mockResolvedValue({
+      tools: () => [mcpTool],
+      close: mocks.closeMcp,
+    });
+
+    const response = await POST(
+      request(JSON.stringify({ agent: "gpt4o", message: { content: "hi" } })),
+      { params: Promise.resolve({ chatId }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.connectMcp).toHaveBeenCalledWith([
+      {
+        name: "local",
+        toolNamePrefix: undefined,
+        transport: {
+          type: "http",
+          url: "http://127.0.0.1:8787/mcp",
+          headers: undefined,
+        },
+      },
+    ]);
+    expect(mocks.getResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ tools: [mcpTool] }),
+    );
   });
 });

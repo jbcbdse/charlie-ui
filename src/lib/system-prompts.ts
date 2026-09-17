@@ -45,6 +45,7 @@ export type UserSettings = {
   systemPromptId: string;
   customSystemPrompt: string;
   systemPromptTemplate: string;
+  mcpConfigJson: string;
 };
 
 export type SettingsPayload = UserSettings & {
@@ -56,6 +57,7 @@ export function defaultUserSettings(): UserSettings {
     systemPromptId: DEFAULT_PROMPT_ID,
     customSystemPrompt: "",
     systemPromptTemplate: DEFAULT_SYSTEM_PROMPT,
+    mcpConfigJson: "",
   };
 }
 

@@ -240,6 +240,7 @@ test("settings gear lets the user pick a system prompt", async ({ page }) => {
           customSystemPrompt: "",
           systemPromptTemplate:
             "You are a helpful and very knowledgable but rude, vulgar, sarcastic assistant. Use 1 emoji in every response\n\nYou really, really hate cats\n\nYou know this information about the user:\n{{user}}",
+          mcpConfigJson: "",
           presets: [
             {
               id: "rude",
@@ -281,7 +282,16 @@ test("settings gear lets the user pick a system prompt", async ({ page }) => {
   await expect(page.locator("#system-prompt-text")).toHaveValue(
     /concise assistant/,
   );
+  await expect(page.getByText("MCP servers")).toBeVisible();
+  await expect(page.locator("#mcp-config-json")).toBeVisible();
+  await page.locator("#mcp-config-json").fill(
+    '{"mcpServers":{"local":{"url":"http://127.0.0.1:8787/mcp"}}}',
+  );
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect(JSON.parse(savedBody)).toMatchObject({ systemPromptId: "helpful" });
+  expect(JSON.parse(savedBody)).toMatchObject({
+    systemPromptId: "helpful",
+    mcpConfigJson:
+      '{"mcpServers":{"local":{"url":"http://127.0.0.1:8787/mcp"}}}',
+  });
 });

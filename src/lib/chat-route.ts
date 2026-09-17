@@ -18,7 +18,8 @@ export function jsonError(error: unknown): NextResponse {
   const status =
     message === "Invalid email" ||
     message === "Invalid chat id" ||
-    message === "Invalid system prompt"
+    message === "Invalid system prompt" ||
+    message.startsWith("Invalid MCP config")
       ? 400
       : message === "Chat not found"
         ? 404

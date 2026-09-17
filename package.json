@@ -16,6 +16,7 @@
     "@jbcbdse/charlie-bedrock": "^1.0.0",
     "@jbcbdse/charlie-core": "^1.0.0",
     "@jbcbdse/charlie-google": "^1.0.0",
+    "@jbcbdse/charlie-mcp": "^1.0.0",
     "@jbcbdse/charlie-ollama": "^1.0.0",
     "@jbcbdse/charlie-openai": "^1.0.0",
     "@ricky0123/vad-react": "^0.0.36",

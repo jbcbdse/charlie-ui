@@ -54,6 +54,7 @@ describe("UserSettingsStore", () => {
       systemPromptId: DEFAULT_PROMPT_ID,
       customSystemPrompt: "",
       systemPromptTemplate: DEFAULT_SYSTEM_PROMPT,
+      mcpConfigJson: "",
     });
   });
 
@@ -94,5 +95,32 @@ describe("UserSettingsStore", () => {
     await expect(
       settings.save("user@example.com", { systemPromptId: "custom" }),
     ).rejects.toThrow("Invalid system prompt");
+  });
+
+  it("saves HTTP MCP config JSON", async () => {
+    const settings = store();
+    const mcpConfigJson = JSON.stringify({
+      mcpServers: { local: { url: "http://127.0.0.1:8787/mcp" } },
+    });
+    const saved = await settings.save("user@example.com", {
+      systemPromptId: DEFAULT_PROMPT_ID,
+      mcpConfigJson,
+    });
+    expect(saved.mcpConfigJson).toBe(mcpConfigJson);
+    expect((await settings.get("user@example.com")).mcpConfigJson).toBe(
+      mcpConfigJson,
+    );
+  });
+
+  it("rejects stdio MCP config", async () => {
+    const settings = store();
+    await expect(
+      settings.save("user@example.com", {
+        systemPromptId: DEFAULT_PROMPT_ID,
+        mcpConfigJson: JSON.stringify({
+          mcpServers: { files: { command: "npx" } },
+        }),
+      }),
+    ).rejects.toThrow("Invalid MCP config");
   });
 });

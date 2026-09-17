@@ -156,7 +156,11 @@ export async function getSettings(email: string): Promise<SettingsPayload> {
 
 export async function saveSettings(
   email: string,
-  body: { systemPromptId: string; customSystemPrompt: string },
+  body: {
+    systemPromptId: string;
+    customSystemPrompt: string;
+    mcpConfigJson: string;
+  },
 ): Promise<SettingsPayload> {
   const response = await fetch("/api/settings", {
     method: "PUT",

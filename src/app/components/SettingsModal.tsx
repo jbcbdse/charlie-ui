@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getSettings, saveSettings } from '@/lib/send-message';
 import { SettingsPayload } from '@/lib/system-prompts';
+import { EXAMPLE_MCP_CONFIG } from '@/lib/mcp-config';
 
 export default function SettingsModal({
   email,
@@ -17,6 +18,7 @@ export default function SettingsModal({
   const [promptId, setPromptId] = useState('rude');
   const [customPrompt, setCustomPrompt] = useState('');
   const [presets, setPresets] = useState<SettingsPayload['presets']>([]);
+  const [mcpConfigJson, setMcpConfigJson] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -28,6 +30,7 @@ export default function SettingsModal({
         setPromptId(settings.systemPromptId);
         setCustomPrompt(settings.customSystemPrompt);
         setPresets(settings.presets);
+        setMcpConfigJson(settings.mcpConfigJson ?? '');
       })
       .catch((err) => {
         if (cancelled) {
@@ -56,6 +59,7 @@ export default function SettingsModal({
       await saveSettings(email, {
         systemPromptId: promptId,
         customSystemPrompt: customPrompt,
+        mcpConfigJson,
       });
       onClose();
     } catch (err) {
@@ -74,7 +78,7 @@ export default function SettingsModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-lg shadow-lg p-4 space-y-4"
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-lg p-4 space-y-4"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="settings-title" className="text-lg font-semibold text-gray-800">
@@ -126,6 +130,26 @@ export default function SettingsModal({
               value={promptValue}
               readOnly={promptId !== 'custom'}
               onChange={(event) => setCustomPrompt(event.target.value)}
+            />
+            <label
+              className="block text-sm font-medium text-gray-700"
+              htmlFor="mcp-config-json"
+            >
+              MCP servers
+            </label>
+            <p className="text-xs text-gray-600">
+              HTTP only (no OAuth, no stdio). Cursor-style JSON with a{' '}
+              <code>url</code> per server:
+            </p>
+            <pre className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto">
+              {EXAMPLE_MCP_CONFIG}
+            </pre>
+            <textarea
+              id="mcp-config-json"
+              className="w-full h-36 border border-gray-300 rounded p-2 text-sm font-mono text-black"
+              value={mcpConfigJson}
+              spellCheck={false}
+              onChange={(event) => setMcpConfigJson(event.target.value)}
             />
           </>
         )}

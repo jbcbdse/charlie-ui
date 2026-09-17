@@ -8,12 +8,14 @@ import {
   isPromptId,
   resolveSystemPrompt,
 } from "./system-prompts";
+import { normalizeMcpConfigJson } from "./mcp-config";
 
 export type UserSettingsDocument = {
   _id: ObjectId;
   userEmail: string;
   systemPromptId: string;
   customSystemPrompt: string;
+  mcpConfigJson: string;
   updatedAt: Date;
 };
 
@@ -40,7 +42,11 @@ export class UserSettingsStore {
 
   async save(
     userEmail: string,
-    input: { systemPromptId: string; customSystemPrompt?: string },
+    input: {
+      systemPromptId: string;
+      customSystemPrompt?: string;
+      mcpConfigJson?: string;
+    },
   ): Promise<UserSettings> {
     const email = this.assertEmail(userEmail);
     const systemPromptId = this.assertPromptId(input.systemPromptId);
@@ -50,6 +56,10 @@ export class UserSettingsStore {
     if (systemPromptId === CUSTOM_PROMPT_ID && !customSystemPrompt.trim()) {
       throw new Error("Invalid system prompt");
     }
+    const mcpConfigJson =
+      input.mcpConfigJson === undefined
+        ? ((await this.users.findOne({ userEmail: email }))?.mcpConfigJson ?? "")
+        : this.assertMcpConfig(input.mcpConfigJson);
     const now = new Date();
     await this.users.updateOne(
       { userEmail: email },
@@ -58,6 +68,7 @@ export class UserSettingsStore {
           userEmail: email,
           systemPromptId,
           customSystemPrompt,
+          mcpConfigJson,
           updatedAt: now,
         },
         $setOnInsert: { _id: new ObjectId() },
@@ -71,6 +82,7 @@ export class UserSettingsStore {
         systemPromptId,
         customSystemPrompt,
       ),
+      mcpConfigJson,
     };
   }
 
@@ -79,6 +91,7 @@ export class UserSettingsStore {
       ? doc.systemPromptId
       : DEFAULT_PROMPT_ID;
     const customSystemPrompt = doc.customSystemPrompt ?? "";
+    const mcpConfigJson = doc.mcpConfigJson ?? "";
     return {
       systemPromptId,
       customSystemPrompt,
@@ -86,6 +99,7 @@ export class UserSettingsStore {
         systemPromptId,
         customSystemPrompt,
       ),
+      mcpConfigJson,
     };
   }
 
@@ -109,5 +123,9 @@ export class UserSettingsStore {
       throw new Error("Invalid system prompt");
     }
     return value;
+  }
+
+  private assertMcpConfig(value: string): string {
+    return normalizeMcpConfigJson(value);
   }
 }
