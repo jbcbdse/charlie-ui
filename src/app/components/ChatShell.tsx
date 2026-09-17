@@ -111,7 +111,7 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
 
   if (!email) {
     return (
-      <main className="flex justify-center items-center h-[calc(100vh-4rem)] bg-gray-100">
+      <main className="flex justify-center items-center h-full bg-gray-100">
         <form
           className="w-full max-w-md bg-white shadow-md rounded-lg p-6 space-y-4"
           onSubmit={(event) => {
@@ -151,7 +151,7 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ChatSessionContext.Provider value={{ email, chats, refreshChats }}>
-      <div className="flex h-[calc(100vh-4rem)] bg-gray-100">
+      <div className="flex h-full min-h-0 overflow-hidden bg-gray-100">
         <aside className="w-64 bg-white border-r flex flex-col">
           <div className="p-3 border-b">
             <button
