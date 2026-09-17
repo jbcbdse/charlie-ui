@@ -67,7 +67,7 @@ export default function ChatInput({ onSubmit, onStop, streaming }: Props) {
   };
 
   return (
-    <div className="w-full p-4">
+    <div className="w-full shrink-0 pt-4">
       <form className="flex items-end space-x-4" onSubmit={handleSubmit}>
         <div className="flex flex-col">
           <label htmlFor="agentId" className="text-gray-600 mb-1">

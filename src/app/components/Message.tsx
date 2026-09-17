@@ -38,7 +38,7 @@ function Message({message, streaming}: Props) {
       }`}
     >
       <div
-        className={`max-w-3xl p-3 rounded-lg ${messageStyles}`}
+        className={`max-w-3xl min-w-0 p-3 rounded-lg break-words ${messageStyles}`}
       >
         <div className="text-xs font-semibold mb-1">{speaker}</div>
         <Markdown className="message-content">{content}</Markdown>

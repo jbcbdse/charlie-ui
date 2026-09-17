@@ -226,11 +226,11 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </aside>
-        <main className="flex-1 p-4 overflow-hidden">
+        <main className="flex-1 min-h-0 min-w-0 p-4 overflow-hidden flex flex-col">
           {error ? (
             <div className="mb-2 text-red-600 text-sm text-center">{error}</div>
           ) : null}
-          <div className="h-full bg-white shadow-md rounded-lg p-4 overflow-hidden">
+          <div className="flex-1 min-h-0 bg-white shadow-md rounded-lg p-4 overflow-hidden flex flex-col">
             {children}
           </div>
         </main>

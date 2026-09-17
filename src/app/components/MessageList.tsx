@@ -9,7 +9,7 @@ interface Props {
 }
 export default function MessageList({messages, stream}: Props) {
   return (
-    <div className="max-h-[55vh] overflow-y-auto">
+    <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
       {messages.map((message, index) => (
         <Message key={index} message={message} />
       ))}

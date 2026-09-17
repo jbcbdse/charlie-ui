@@ -121,7 +121,7 @@ export default function ChatConversationPage() {
   };
 
   return (
-    <div className="chat-box flex flex-col space-y-4 h-full">
+    <div className="chat-box flex flex-col h-full min-h-0">
       <MessageList messages={messages} stream={stream} />
       {error ? (
         <div className="text-red-600 text-center text-sm px-4">{error}</div>
