@@ -1,7 +1,8 @@
 import React from "react"
 import Markdown from "react-markdown"
-import { ChatMessage } from "@jbcbdse/charlie-core";
+import { ChatMessage, MessageToolCall } from "@jbcbdse/charlie-core";
 import Thoughts from "./Thoughts";
+import DetailsBlock from "./DetailsBlock";
 
 type Props = {
   message: ChatMessage;
@@ -11,25 +12,33 @@ function Message({message, streaming}: Props) {
   if (message.role === "reasoning") {
     return <Thoughts content={message.content ?? ""} />;
   }
+  if (message.role === "tool_call") {
+    return (
+      <DetailsBlock
+        title={toolCallTitle(message)}
+        content={JSON.stringify(message.toolCalls, null, 2)}
+      />
+    );
+  }
+  if (message.role === "tool") {
+    return (
+      <DetailsBlock
+        title={message.name ? `Tool result: ${message.name}` : "Tool result"}
+        content={message.content}
+      />
+    );
+  }
   const direction = message.role === "user" ? "outgoing" : "incoming";
   const speaker = message.role === "user" ? message.name || "User" :
     message.role === "assistant" ? message.name || "Assistant" :
-    message.role === "system" ? "System" :
-    message.role === "tool" ? message.name : 
-    message.role === "tool_call" ? "Tool Call" : "Unknown";
-  const content = message.role === "user" ? message.content : 
-    message.role === "assistant" ? message.content : 
-    message.role === "tool" ? message.content :
-    message.role === "tool_call" ? JSON.stringify(message.toolCalls, null, 2) :
-    message.role === "system" ? message.content : "Unknown";
+    message.role === "system" ? "System" : "Unknown";
+  const content = message.content;
   const messageStyles =
     message.role === "user"
       ? "bg-blue-500 text-white"
       : message.role === "assistant"
       ? "bg-gray-300 text-black"
-      : message.role === "tool" || message.role === "tool_call"
-      ? "bg-green-500 text-white"
-      : "bg-gray-200 text-black"; // fallback for unknown roles
+      : "bg-gray-200 text-black";
   
   return (
     <div
@@ -51,3 +60,11 @@ function Message({message, streaming}: Props) {
 }
 
 export default React.memo(Message);
+
+function toolCallTitle(message: MessageToolCall): string {
+  const names = message.toolCalls.map((call) => call.function.name);
+  if (names.length === 0) {
+    return "Tool call";
+  }
+  return `Tool call: ${names.join(", ")}`;
+}

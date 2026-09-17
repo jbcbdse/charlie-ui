@@ -214,6 +214,74 @@ test("unknown agent shows an error instead of crashing", async ({ page }) => {
   await expect(page.getByText("Unknown agent: nope")).toBeVisible();
 });
 
+test("tool calls and results are collapsed by default", async ({ page }) => {
+  await page.route("**/api/chats**", async (route) => {
+    const path = apiPath(route.request().url());
+    const method = route.request().method();
+    if (path === "/api/chats" && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([CHAT]),
+      });
+      return;
+    }
+    if (path === `/api/chats/${CHAT_ID}` && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...CHAT,
+          messages: [
+            { role: "user", name: "User", content: "list translations" },
+            {
+              role: "tool_call",
+              toolCalls: [
+                {
+                  id: "call_1",
+                  type: "function",
+                  function: {
+                    name: "list_works",
+                    arguments: { secret: "HIDDEN_TOOL_ARGS" },
+                  },
+                },
+              ],
+            },
+            {
+              role: "tool",
+              name: "list_works",
+              content: "HIDDEN_TOOL_RESULT",
+              toolCallId: "call_1",
+              returnDirect: false,
+              status: "success",
+            },
+            {
+              role: "assistant",
+              name: "Assistant",
+              content: "Here they are.",
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/chat");
+  await enterEmail(page);
+  await page.getByRole("link", { name: "New chat" }).click();
+  await expect(page.getByText("Here they are.")).toBeVisible();
+  await expect(page.getByText("Tool call: list_works")).toBeVisible();
+  await expect(page.getByText("Tool result: list_works")).toBeVisible();
+  await expect(page.getByText("HIDDEN_TOOL_ARGS")).toBeHidden();
+  await expect(page.getByText("HIDDEN_TOOL_RESULT")).toBeHidden();
+  await page.getByText("Tool call: list_works").click();
+  await expect(page.getByText("HIDDEN_TOOL_ARGS")).toBeVisible();
+  await page.getByText("Tool result: list_works").click();
+  await expect(page.getByText("HIDDEN_TOOL_RESULT")).toBeVisible();
+});
+
 test("settings gear lets the user pick a system prompt", async ({ page }) => {
   let savedBody = "";
   await page.route("**/api/chats**", async (route) => {
