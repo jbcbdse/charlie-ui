@@ -96,13 +96,7 @@ export const agents: Record<AvailableAgent, ChatAgent> = {
   }),
   ollama: new AiChatAgent({
     chatExecutor: new OllamaExecutor({
-      modelId: "qwen3.5:9b-q8_0",
-    }),
-    systemPromptTemplate: promptTemplate,
-  }),
-  ollama35b: new AiChatAgent({
-    chatExecutor: new OllamaExecutor({
-      modelId: "qwen3.6:35b-a3b",
+      modelId: "gemma4:12b",
     }),
     systemPromptTemplate: promptTemplate,
   }),
