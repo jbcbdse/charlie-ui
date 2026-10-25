@@ -31,3 +31,76 @@ body {
     text-wrap: balance;
   }
 }
+
+@layer components {
+  .message-content p {
+    @apply my-2;
+  }
+  .message-content h1,
+  .message-content h2,
+  .message-content h3,
+  .message-content h4 {
+    @apply font-bold mt-3 mb-1 leading-tight;
+  }
+  .message-content h1 {
+    @apply text-xl;
+  }
+  .message-content h2 {
+    @apply text-lg;
+  }
+  .message-content h3,
+  .message-content h4 {
+    @apply text-base;
+  }
+  .message-content ul {
+    @apply my-2 pl-5 list-disc;
+  }
+  .message-content ol {
+    @apply my-2 pl-5 list-decimal;
+  }
+  .message-content li {
+    @apply my-0.5;
+  }
+  .message-content pre {
+    @apply my-2 px-3 py-2 overflow-x-auto rounded text-sm;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+  .message-content code {
+    @apply font-mono text-[0.9em];
+  }
+  .message-content :not(pre) > code {
+    @apply px-1 py-0.5 rounded;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+  .message-content a {
+    @apply underline;
+  }
+  .message-content blockquote {
+    @apply my-2 pl-3 italic;
+    border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent);
+  }
+  .message-content hr {
+    @apply my-3;
+    border-color: color-mix(in srgb, currentColor 25%, transparent);
+  }
+  .message-content .message-table {
+    @apply my-2 overflow-x-auto;
+  }
+  .message-content table {
+    @apply w-full text-sm border-collapse;
+  }
+  .message-content th,
+  .message-content td {
+    @apply px-2 py-1 text-left align-top;
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  }
+  .message-content th {
+    @apply font-semibold;
+  }
+  .message-content > :first-child {
+    @apply mt-0;
+  }
+  .message-content > :last-child {
+    @apply mb-0;
+  }
+}

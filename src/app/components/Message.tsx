@@ -1,5 +1,6 @@
 import React from "react"
 import Markdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { ChatMessage, MessageToolCall } from "@jbcbdse/charlie-core";
 import Thoughts from "./Thoughts";
 import DetailsBlock from "./DetailsBlock";
@@ -50,7 +51,23 @@ function Message({message, streaming}: Props) {
         className={`max-w-3xl min-w-0 p-3 rounded-lg break-words ${messageStyles}`}
       >
         <div className="text-xs font-semibold mb-1">{speaker}</div>
-        <Markdown className="message-content">{content}</Markdown>
+        {message.role === "assistant" ? (
+          <Markdown
+            className="message-content"
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table: ({ children }) => (
+                <div className="message-table">
+                  <table>{children}</table>
+                </div>
+              ),
+            }}
+          >
+            {content}
+          </Markdown>
+        ) : (
+          <div className="whitespace-pre-wrap">{content}</div>
+        )}
         {streaming ? (
           <span className="inline-block w-2 h-4 ml-0.5 align-middle bg-gray-700 animate-pulse" />
         ) : null}

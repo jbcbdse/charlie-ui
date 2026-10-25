@@ -282,6 +282,50 @@ test("tool calls and results are collapsed by default", async ({ page }) => {
   await expect(page.getByText("HIDDEN_TOOL_RESULT")).toBeVisible();
 });
 
+test("assistant replies render markdown", async ({ page }) => {
+  await page.route("**/api/chats**", async (route) => {
+    const path = apiPath(route.request().url());
+    const method = route.request().method();
+    if (path === "/api/chats" && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([CHAT]),
+      });
+      return;
+    }
+    if (path === `/api/chats/${CHAT_ID}` && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...CHAT,
+          messages: [
+            { role: "user", name: "User", content: "format this" },
+            {
+              role: "assistant",
+              name: "Assistant",
+              content:
+                "A **bold** word and a list:\n\n- alpha\n- beta\n\n# Heading\n\n| Viewpoint | Origin |\n| --- | --- |\n| Traditional | Fallen angels |\n| Sethite | Human lineage |",
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/chat");
+  await enterEmail(page);
+  await page.getByRole("link", { name: "New chat" }).click();
+  await expect(page.getByRole("heading", { name: "Heading" })).toBeVisible();
+  await expect(page.locator(".message-content strong")).toHaveText("bold");
+  await expect(page.getByRole("listitem")).toHaveText(["alpha", "beta"]);
+  await expect(page.getByRole("columnheader", { name: "Viewpoint" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Fallen angels" })).toBeVisible();
+});
+
 test("settings gear lets the user pick a system prompt", async ({ page }) => {
   let savedBody = "";
   await page.route("**/api/chats**", async (route) => {
@@ -346,6 +390,9 @@ test("settings gear lets the user pick a system prompt", async ({ page }) => {
   await expect(page.getByRole("radio", { name: "Rude Charlie" })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Helpful" })).toBeVisible();
   await expect(page.locator("#system-prompt-text")).toHaveValue(/hate cats/);
+  await expect(page.locator("#system-prompt-text")).not.toHaveValue(
+    /Respond using markdown/,
+  );
   await page.getByRole("radio", { name: "Helpful" }).click();
   await expect(page.locator("#system-prompt-text")).toHaveValue(
     /concise assistant/,
