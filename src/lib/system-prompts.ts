@@ -7,6 +7,7 @@ import {
 export const CUSTOM_PROMPT_ID = "custom";
 export const DEFAULT_PROMPT_ID = "rude";
 export const MAX_PROMPT_LENGTH = 8000;
+export const MARKDOWN_INSTRUCTION = "Respond using markdown.";
 
 export type SystemPromptPreset = {
   id: string;
@@ -82,15 +83,24 @@ export function isPromptId(value: string): boolean {
   );
 }
 
+export function withMarkdownInstruction(template: string): string {
+  const trimmed = template.trim();
+  return trimmed
+    ? `${trimmed}\n\n${MARKDOWN_INSTRUCTION}`
+    : MARKDOWN_INSTRUCTION;
+}
+
 export class MetaSystemPromptTransformer implements ChatMessageTransformer {
   transform(
     messages: ChatMessage[],
     context: ChatAgentContext,
   ): ChatMessage[] {
     const override = context.meta.systemPromptTemplate;
-    if (typeof override === "string" && override.trim()) {
-      context.systemPromptTemplate = override;
-    }
+    const template =
+      typeof override === "string" && override.trim()
+        ? override
+        : context.systemPromptTemplate;
+    context.systemPromptTemplate = withMarkdownInstruction(template ?? "");
     return messages;
   }
 }
